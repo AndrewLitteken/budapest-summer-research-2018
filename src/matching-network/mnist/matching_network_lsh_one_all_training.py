@@ -10,7 +10,8 @@ from sklearn import svm
 
 # Import data, to be replaced with more flexible importing
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+  one_hot=True)
 
 # Hardware specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -45,7 +46,12 @@ period = 1000
 if len(sys.argv) > 1:
   period = int(sys.argv[1])
 
-SAVE_PATH = "./models/lsh-training-one-all-"+str(period)+"-"+str(nClasses)
+if len(sys.argv) > 3:
+    base = sys.argv[3] + "/lsh-training-one-all-"
+else
+    base = "/tmp/lsh-training-one-all-"
+
+SAVE_PATH = base + str(period) + "-" + str(nClasses)
 
 # Collecting sample both for query and for testing
 def get_samples(mnistNum, nSupportImgs, testing = False):

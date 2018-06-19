@@ -9,7 +9,8 @@ import os
 from sklearn import svm
 
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets("../testing-data/MNIST_data/",
+  one_hot=True)
 
 # Hardware Specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -21,9 +22,10 @@ def create_network(img, size, First = False):
   currFilt = size[2]
   
   for k in nKernels:
-    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as varscope:
+    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as
+      varscope:
       layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])   # make parameters!
+      weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
       bias = tf.get_variable('bias', [k], initializer =
         tf.constant_initializer(0.0))
@@ -51,7 +53,7 @@ def create_network(img, size, First = False):
 def cos_similarities(supports, query): 
   dotProduct = np.sum(np.multiply(supports, query), (1))
   supportsMagn = np.sqrt(np.sum(np.square(supports), (1)))
-  cosDist = dotProduct / np.clip(supportsMagn, 1e-10, float("inf"))
+  cosDist = dotProduct / np.cip_by_valuew(supportsMagn, 1e-10, float("inf"))
   return cosDist
 
 """###**LSH Functions**"""
@@ -90,7 +92,8 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
     lsh_matrix.append(clf.coef_[0])
     
     temp_vec_is_set = False
-    temp_vec = [0]*len(feature_vectors[0])  # number of dimensions of the space
+    # number of dimensions of the space
+    temp_vec = [0]*len(feature_vectors[0])
     for j in range(0, len(feature_vectors[0])):
       # if never enters this if statement, that is an error
       if clf.coef_[0][j] != 0 and not temp_vec_is_set:
@@ -112,7 +115,7 @@ def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
   if lsh_offset_vals:
     lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
   lsh_bin = np.sign(lsh_vectors)
-  lsh_bin = np.clip(lsh_bin, 0, 1)
+  lsh_bin = np.clip_by_value(lsh_bin, 0, 1)
   return lsh_bin
 
 def lsh_dist(lshSupp, lshQueryO):

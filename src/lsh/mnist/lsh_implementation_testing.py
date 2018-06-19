@@ -1,5 +1,5 @@
-# Incorporates both one vs Rest and random with command line arguments to make 
-# more easily scriptable
+# Incorporates both one vs Rest and random with command line arguments to 
+# make more easily scriptable
 
 import tensorflow as tf
 import numpy as np
@@ -10,7 +10,8 @@ import os
 from sklearn import svm
 
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+  one_hot=True)
 
 # Hardware specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -44,7 +45,7 @@ elif lsh_method == "trained":
 if len(sys.argv) > 3:
   nTrials = int(sys.argv[3])
 
-SAVE_PATH = "./mymodel-fc-3000"
+SAVE_PATH = sys.argv[-1]
 
 # Query Information - vector
 dataset = tf.placeholder(tf.float32, [None]+size)    # batch size
@@ -55,13 +56,15 @@ def create_network(img, size, First = False):
   currFilt = size[2]
   
   for k in nKernels:
-    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as varscope:
+    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as
+      varscope:
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
       bias = tf.get_variable('bias', [k], initializer = 
         tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
+        padding="SAME")
       convR = tf.add(convR, bias)
       reluR = tf.nn.relu(convR)
       poolR = tf.nn.max_pool(reluR, ksize=[1,2,2,1], strides = [1,2,2,1], 
@@ -131,7 +134,8 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
     # lsh_offset_vals.append(clf.intercept_[0]) # NOT SURE
     
     temp_vec_is_set = False
-    temp_vec = [0]*len(feature_vectors[0])  # number of dimensions of the space
+    # number of dimensions of the space
+    temp_vec = [0]*len(feature_vectors[0])
     for j in range(0, len(feature_vectors[0])):
       # if never enters this if statement, that is an error
       if clf.coef_[0][j] != 0 and not temp_vec_is_set:

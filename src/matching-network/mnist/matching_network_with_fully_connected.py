@@ -8,7 +8,8 @@ import sys
 import os
 
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+  one_hot=True)
 
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -37,7 +38,12 @@ if len(sys.argv) > 1:
 nClasses = len(numbers)
 nImgsSuppClass = 5
 
-SAVE_PATH = "./model/lsh-training-cosine-"+str(nClasses)
+if len(sys.argv) > 2:
+    base = sys.argv[2] + "/cosine-"
+else
+    base = "/tmp/cosine-"
+
+SAVE_PATH = base + str(nClasses)
 
 # Collecting sample both for query and for testing
 def get_samples(mnistNum, nSupportImgs):

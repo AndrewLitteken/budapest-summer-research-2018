@@ -6,8 +6,8 @@ import random
 import math
 
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("./MNIST_data/", one_hot=True)
-
+mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+  one_hot=True)
 
 # Graph Constants
 size = [28, 28, 1]
@@ -22,7 +22,7 @@ MAX_SLOPE = 10
 nPlanes = 500
 nTrials = 1000
 
-SAVE_PATH = "model/lsh-training-cosine-3-5000"
+SAVE_PATH = sys.argv[-1]
 
 tf.reset_default_graph()
 
@@ -36,13 +36,15 @@ def create_network(img, size, First = False):
   currFilt = size[2]
   
   for k in nKernels:
-    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as varscope:
+    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as
+      varscope:
       layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])   # make parameters!
+      weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
       bias = tf.get_variable('bias', [k], initializer = 
         tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], 
+        padding="SAME")
       convR = tf.add(convR, bias)
       reluR = tf.nn.relu(convR)
       poolR = tf.nn.max_pool(reluR, ksize=[1,2,2,1], strides=[1,2,2,1], 
@@ -115,10 +117,10 @@ with tf.Session() as session:
   Saver = tf.train.Saver()
   Saver.restore(session, SAVE_PATH)
  
-  # for these, we may want to just feed through all of the mnist data for the 
-  # feature vectors
-  rawDataset = np.reshape(mnist.train.images, [mnist.train.images.shape[0]] + 
-    size)
+  # for these, we may want to just feed through all of the mnist data for 
+  # the feature vectors
+  rawDataset = np.reshape(mnist.train.images, [mnist.train.images.shape[0]] 
+    + size)
   rawLabels = mnist.train.labels
   
   featureVectors = np.empty([55000, fully_connected_nodes])

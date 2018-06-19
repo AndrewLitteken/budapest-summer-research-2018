@@ -9,7 +9,8 @@ import os
 
 # Import data, to be replaced with more flexible importing
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+  one_hot=True)
 
 # Hardware Specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -43,10 +44,16 @@ if len(sys.argv) > 1:
   if sys.argv[1] == "True":
     training = True
 
+if len(sys.argv) > 4:
+    base = sys.argv[4] + "/lsh-training-random-"
+else
+    base = "/tmp/lsh-training-random-"
+
+SAVE_PATH = base + str(nClasses)
 if len(sys.argv) > 3:
   nPlanes = int(sys.argv[3])
-SAVE_PATH= "./model/lsh-training-random-"+str(nPlanes)+"-"+str(nClasses)+"-"+
-  str(training)
+
+SAVE_PATH= base + str(nPlanes) + "-" + str(nClasses) + "-" + str(training)
 
 # Collecting sample both for query and for testing
 def get_samples(mnistNum, nSupportImgs, testing = False):
@@ -136,7 +143,8 @@ def create_network(img, size, First = False):
       currFilt = k
       bias = tf.get_variable('bias', [k], initializer = 
         tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+      convR = tf.nn.conv2d(currInp, weight, strides = [1,1,1,1], padding = 
+        "SAME")
       convR = tf.add(convR, bias)
       reluR = tf.nn.relu(convR)
       poolR = tf.nn.max_pool(reluR, ksize = [1,poolS,poolS,1], 
@@ -176,7 +184,8 @@ lsh_planes, lsh_offsets = generate_lsh_planes(query_features, nPlanes)
 
 # Reshape to fit the limits for lsh application
 query_features_shape = tf.reshape(query_features, [query_features.shape[0], 
-  query_features.shape[1] * query_features.shape[2] * query_features.shape[3]])
+  query_features.shape[1] * query_features.shape[2] * 
+  query_features.shape[3]])
 
 # Apply the lsh planes
 query_lsh = tf.matmul(query_features_shape, lsh_planes)
