@@ -34,18 +34,23 @@ vectors_passed = 1000
 
 tf.reset_default_graph()
 
-lsh_method = sys.argv[1]
+lsh_method = sys.argv[2]
 if lsh_method == "random":
-  nPlanes = int(sys.argv[2])
+  if len(sys.argv) > 3:
+    nPlanes = int(sys.argv[3])
 
 elif lsh_method == "trained":
-  vectors_passed = int(sys.argv[2])
+  if len(sys.argv) > 3:
+    vectors_passed = int(sys.argv[3])
   nPlanes = 10
 
-if len(sys.argv) > 3:
-  nTrials = int(sys.argv[3])
+if len(sys.argv) > 4:
+  nTrials = int(sys.argv[4])
 
-SAVE_PATH = sys.argv[-1]
+if len(sys.argv) < 2:
+  print("no model provided")
+  exit()
+SAVE_PATH = sys.argv[1]
 
 # Query Information - vector
 dataset = tf.placeholder(tf.float32, [None]+size)    # batch size
@@ -56,8 +61,8 @@ def create_network(img, size, First = False):
   currFilt = size[2]
   
   for k in nKernels:
-    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as
-      varscope:
+    with tf.variable_scope('conv'+str(layer),
+      reuse = tf.AUTO_REUSE) as varscope:
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
@@ -217,6 +222,9 @@ for i in range(nTrials):
   occurences = np.zeros(10)
   for j in range(nSupp):
     supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
+    while (occurences[np.argmax(mnist.train.labels[supp_index])] > 0 and
+      0 in occurences):
+      supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
     supp.append(featureVectors[supp_index])
     supp_labels.append(np.argmax(mnist.train.labels[supp_index]))
     occurences[np.argmax(mnist.train.labels[supp_index])] += 1
@@ -234,6 +242,7 @@ for i in range(nTrials):
   # find closest match
   distances = lsh_dist(lsh_bin, lsh_bin_q)
   maximum = max(distances)
+  LSHMatch = supp_labels[np.argmax(distances)]
 
   q_list = []
   for j in range(nSupp):

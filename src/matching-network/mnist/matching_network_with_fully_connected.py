@@ -31,22 +31,22 @@ classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = [0,1,2]
 numbersTest = [7,8,9]
 nClasses = len(numbers)
-if len(sys.argv) > 1:
-  nClasses = int(sys.argv[1])
+if len(sys.argv) > 2:
+  nClasses = int(sys.argv[2])
   numbers = classList[:nClasses]
   numbersTest = classList[10-nClasses:]
 nClasses = len(numbers)
 nImgsSuppClass = 5
 
-if len(sys.argv) > 2:
-    base = sys.argv[2] + "/cosine-"
-else
+if len(sys.argv) > 1:
+    base = sys.argv[1] + "/cosine-"
+else:
     base = "/tmp/cosine-"
 
 SAVE_PATH = base + str(nClasses)
 
 # Collecting sample both for query and for testing
-def get_samples(mnistNum, nSupportImgs):
+def get_samples(mnistNum, nSupportImgs, testing = False):
   one_hot_list = [0.] * 10
   one_hot_list[mnistNum] = 1.
   samples = 0
@@ -59,14 +59,14 @@ def get_samples(mnistNum, nSupportImgs):
   while samples < nSupportImgs:
     if (imageNum == len(mnist.train.images) and not testing):
       imageNum = 0
-    elif (imageNum == len(mnist.test.images) and tetsing):
+    elif (imageNum == len(mnist.test.images) and testing):
       imageNum = 0
     if not testing:
       labelThis = mnist.train.labels[imageNum, :]
     else:
       labelThis = mnist.test.labels[imageNum, :]
     if np.all(labelThis == one_hot_list):
-      if not training:
+      if not testing:
         imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
         pickedLabels.append(mnist.train.labels[imageNum, :])
       else:
@@ -126,7 +126,8 @@ def create_network(img, size, First = False):
   currFilt = size[2]
   
   for k in nKernels:
-    with tf.variable_scope('conv'+str(layer), reuse=tf.AUTO_REUSE) as varscope:
+    with tf.variable_scope('conv'+str(layer), 
+      reuse=tf.AUTO_REUSE) as varscope:
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k

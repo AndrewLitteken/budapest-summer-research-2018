@@ -142,8 +142,8 @@ nTrials = 1000
 
 save_paths = []
 
-if len(sys.argv) < 2:
-  save_paths.append("./model/lsh-training-cosine-3-5000")
+if len(sys.argv) == 2:
+  save_paths.append(sys.argv[1])
 else:
   if sys.argv[1] == "random_planes":
     trained_list = ["False", "True"]

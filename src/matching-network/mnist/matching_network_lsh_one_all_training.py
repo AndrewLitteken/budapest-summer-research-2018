@@ -33,8 +33,8 @@ learning_rate = 1e-5
 classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = [1,2,3]
 numbersTest = [8,9,0]
-if len(sys.argv) > 2:
-  nClasses = int(sys.argv[2])
+if len(sys.argv) > 3:
+  nClasses = int(sys.argv[3])
   numbers = classList[:nClasses]
   numbersTest = classList[10-nClasses:]
 nClasses = len(numbers)
@@ -43,12 +43,12 @@ nImgsSuppClass = 5
 # Plane Training information
 nPickedPlanes = len(numbers)
 period = 1000
-if len(sys.argv) > 1:
-  period = int(sys.argv[1])
+if len(sys.argv) > 2:
+  period = int(sys.argv[2])
 
-if len(sys.argv) > 3:
-    base = sys.argv[3] + "/lsh-training-one-all-"
-else
+if len(sys.argv) > 1:
+    base = sys.argv[1] + "/lsh-training-one-all-"
+else:
     base = "/tmp/lsh-training-one-all-"
 
 SAVE_PATH = base + str(period) + "-" + str(nClasses)
@@ -67,14 +67,14 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
   while samples < nSupportImgs:
     if (imageNum == len(mnist.train.images) and not testing):
       imageNum = 0
-    elif (imageNum == len(mnist.test.images) and tetsing):
+    elif (imageNum == len(mnist.test.images) and testing):
       imageNum = 0
     if not testing:
       labelThis = mnist.train.labels[imageNum, :]
     else:
       labelThis = mnist.test.labels[imageNum, :]
     if np.all(labelThis == one_hot_list):
-      if not training:
+      if not testing:
         imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
         pickedLabels.append(mnist.train.labels[imageNum, :])
       else:

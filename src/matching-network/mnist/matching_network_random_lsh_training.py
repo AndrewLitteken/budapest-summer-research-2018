@@ -32,26 +32,26 @@ learning_rate = 1e-5
 classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = [1,2,3]
 numbersTest = [8,9,0]
-if len(sys.argv) > 2:
-  nClasses = int(sys.argv[2])
+if len(sys.argv) > 3:
+  nClasses = int(sys.argv[3])
   numbers = classList[:nClasses]
   numbersTest = classList[10-nClasses:]
 nClasses = len(numbers)
 nImgsSuppClass = 5
 
 training = False
-if len(sys.argv) > 1:
-  if sys.argv[1] == "True":
+if len(sys.argv) > 2:
+  if sys.argv[2] == "True":
     training = True
 
-if len(sys.argv) > 4:
-    base = sys.argv[4] + "/lsh-training-random-"
-else
+if len(sys.argv) > 1:
+    base = sys.argv[1] + "/lsh-training-random-"
+else:
     base = "/tmp/lsh-training-random-"
 
 SAVE_PATH = base + str(nClasses)
-if len(sys.argv) > 3:
-  nPlanes = int(sys.argv[3])
+if len(sys.argv) > 4:
+  nPlanes = int(sys.argv[4])
 
 SAVE_PATH= base + str(nPlanes) + "-" + str(nClasses) + "-" + str(training)
 
@@ -69,7 +69,7 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
   while samples < nSupportImgs:
     if (imageNum == len(mnist.train.images) and not testing):
       imageNum = 0
-    elif (imageNum == len(mnist.test.images) and tetsing):
+    elif (imageNum == len(mnist.test.images) and testing):
       imageNum = 0
     if not testing:
       labelThis = mnist.train.labels[imageNum, :]

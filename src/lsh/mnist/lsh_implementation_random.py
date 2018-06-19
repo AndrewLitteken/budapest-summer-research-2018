@@ -4,6 +4,8 @@ import tensorflow as tf
 import numpy as np
 import random
 import math
+import sys
+import os
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
@@ -22,7 +24,10 @@ MAX_SLOPE = 10
 nPlanes = 500
 nTrials = 1000
 
-SAVE_PATH = sys.argv[-1]
+if len(sys.argv) < 2:
+  print("no model provided")
+  exit()
+SAVE_PATH = sys.argv[1]
 
 tf.reset_default_graph()
 
@@ -36,8 +41,8 @@ def create_network(img, size, First = False):
   currFilt = size[2]
   
   for k in nKernels:
-    with tf.variable_scope('conv'+str(layer),reuse=tf.AUTO_REUSE) as
-      varscope:
+    with tf.variable_scope('conv'+str(layer),reuse = 
+      tf.AUTO_REUSE) as varscope:
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
@@ -157,8 +162,8 @@ for i in range(nTrials):
   occurences = np.zeros(10)
   for j in range(nSupp):
     supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-    while occurences[np.argmax(mnist.train.labels[supp_index])] > 0 
-      and 0 in occurences:
+    while (occurences[np.argmax(mnist.train.labels[supp_index])] > 0 
+      and 0 in occurences):
       supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
     supp.append(featureVectors[supp_index])
     supp_labels.append(np.argmax(mnist.train.labels[supp_index]))

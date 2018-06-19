@@ -5,6 +5,8 @@ import numpy as np
 import random
 import math
 from sklearn import svm
+import sys
+import os
 
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
@@ -23,7 +25,10 @@ MAX_SLOPE = 10
 nPlanes = 3500
 nTrials = 1000
 
-SAVE_PATH = sys.argv[-1]
+if len(sys.argv) < 2:
+  print("no model provided")
+  exit()
+SAVE_PATH = sys.argv[1]
 
 tf.reset_default_graph()
 
@@ -56,11 +61,11 @@ def create_network(img, size, First = False):
     CurrentShape=currInp.get_shape()
     FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
     FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,128])
+    W = tf.get_variable('W',[FeatureLength,fully_connected_nodes])
     FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[128])
+    Bias = tf.get_variable('Bias',[fully_connected_nodes])
     FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [-1,128])
+    FC = tf.reshape(FC, [-1,fully_connected_nodes])
   
   return FC
 
@@ -83,7 +88,6 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
   
   lsh_matrix = []
   lsh_offset_vals = []
-  clfs = []
   
   feature_vectors = np.reshape(np.asarray(feature_vectors),
     (len(feature_vectors), -1))
@@ -107,7 +111,6 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
     clf = svm.SVC(kernel='linear', C = 1.0)
     clf.fit(x,y)
       
-    clfs.append(clf)
     lsh_matrix.append(clf.coef_[0])
     
     # create offset value
@@ -130,7 +133,7 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
   return lsh_matrix, lsh_offset_vals
 
 def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
-  feature_vectors = np.reshape(feature_vectors, (-1, 128))
+  feature_vectors = np.reshape(feature_vectors, (-1, fully_connected_nodes))
   lsh_vectors = np.matmul(feature_vectors, np.transpose(LSH_matrix))
   lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
   lsh_bin = np.sign(lsh_vectors)
@@ -166,7 +169,7 @@ with tf.Session() as session:
     + size)
   rawLabels = mnist.train.labels
   
-  featureVectors = np.empty([55000, 128])
+  featureVectors = np.empty([55000, fully_connected_nodes])
   for i in range(55):
     FEAT = (session.run([features], feed_dict = 
       {dataset: rawDataset[i*1000:(i+1)*1000]}))
@@ -177,7 +180,7 @@ with tf.Session() as session:
     [mnist.test.images.shape[0]]+size)
   queryLabels = mnist.test.labels
   
-  queryFeatureVectors = np.empty([10000, 128])
+  queryFeatureVectors = np.empty([10000, fully_connected_nodes])
   for i in range(10):
     FEAT = (session.run([features], feed_dict = 
       {dataset: queryDataset[i*1000:(i+1)*1000]}))
@@ -200,8 +203,8 @@ for i in range(nTrials):
   occurences = np.zeros(10)
   for j in range(nSupp):
     supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-    while occurences[np.argmax(mnist.train.labels[supp_index])] > 0 
-      and 0 in occurences:
+    while (occurences[np.argmax(mnist.train.labels[supp_index])] > 0 and
+      0 in occurences):
       supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
     supp.append(featureVectors[supp_index])
     supp_labels.append(np.argmax(mnist.train.labels[supp_index]))
@@ -212,19 +215,11 @@ for i in range(nTrials):
   query = queryFeatureVectors[query_index]
   query_label = np.argmax(queryLabels[query_index])
 
-  predictions = []
-  for clf in clfs:
-    result = clf.predict([np.reshape(np.asarray(query), (-1))])
-    predictions.append(result[0])
   
   # get lsh binaries (from application to matrix) for supp and query
   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
   lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes, 
     lsh_offset_vals)
-  
-  are_equal = np.array_equal(predictions, lsh_bin_q[0])
-  if are_equal:
-    num_right += 1
 
   # calculate lsh distances
   # find closest match
