@@ -7,10 +7,19 @@ import math
 import sys
 import os
 
-# Import data, to be replaced with more flexible importing
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
-  one_hot=True)
+train_file_path = "../../../testing-data/cifar/data_batch_"
+train_images_raw = np.empty((0, 3072))
+train_labels_raw = np.empty((0))
+for i in range(1,6):
+  train_file_name = train_file_path + str(i)
+  with open(train_file_name, 'rb') as cifar_file:
+    data = pickle.load(cifar_file, encoding = 'bytes')
+    train_images_raw = np.concatenate((train_images_raw, data[b"data"]), axis = 0)
+    train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), axis = 0)
+
+test_file_name = "../../../testing-data/cifar/test_batch"
+with open(test_file_name, 'rb') as cifar_file:
+  test = pickle.load(cifar_file, encoding = 'bytes')
 
 # Hardware Specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -45,7 +54,7 @@ if len(sys.argv) > 2:
     training = True
 
 if len(sys.argv) > 1:
-    base = sys.argv[1] + "/lsh-training-random-"
+    base = sys.argv[1] + "/cifar-lsh-training-random-"
 else:
     base = "/tmp/lsh-training-random-"
 
@@ -54,6 +63,20 @@ if len(sys.argv) > 4:
   nPlanes = int(sys.argv[4])
 
 SAVE_PATH= base + str(nPlanes) + "-" + str(nClasses) + "-" + str(training)
+
+train_images = []
+train_labels = []
+list_range = np.arange(len(train_images_raw))
+np.random.shuffle(list_range)
+for index, i in enumerate(list_range):
+  train_images.append(train_images_raw[i])
+  train_labels.append(train_labels_raw[i])
+
+train_images = np.reshape(train_images, [len(train_images)] + size)
+
+test_images = test[b"data"]
+test_images = np.reshape(test_images, [len(test_images)] + size)
+test_labels = test[b"labels"]
 
 # Collecting sample both for query and for testing
 def get_samples(mnistNum, nSupportImgs, testing = False):
@@ -67,20 +90,21 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
   pickedImages = []
   pickedLabels = []
   while samples < nSupportImgs:
-    if (imageNum == len(mnist.train.images) and not testing):
+    if (imageNum == len(train_images) and not testing):
       imageNum = 0
-    elif (imageNum == len(mnist.test.images) and testing):
+    elif (imageNum == len(test_images) and testing):
       imageNum = 0
     if not testing:
-      labelThis = mnist.train.labels[imageNum, :]
+      labelThis = train_labels[imageNum]
     else:
-      labelThis = mnist.test.labels[imageNum, :]
-    if np.all(labelThis == one_hot_list):
-      if not training:
-        imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
-        pickedLabels.append(mnist.train.labels[imageNum, :])
+      labelThis = test_labels[imageNum]
+    if labelThis == np.argmax(one_hot_list):
+      if not testing:
+        imgReshape = np.reshape(train_images[imageNum,:], size)
+        pickedLabels.append(train_labels[imageNum])
       else:
-        pickedLabels.append(mnist.test.labels[imageNum, :])
+        imgReshape = np.reshape(test_images[imageNum,:], size)
+        pickedLabels.append(test_labels[imageNum])
       pickedImages.append(imgReshape)
       samples += 1
     imageNum += 1

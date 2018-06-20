@@ -50,8 +50,8 @@ if len(sys.argv) > 2:
 nClasses = len(numbers)
 nImgsSuppClass = 2
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/cosine-"
+if len(sys.argv) > 1:
+    base = sys.argv[1] + "/cifar-cosine-"
 else:
     base = "/tmp/cifar-cosine-"
 
