@@ -1,4 +1,4 @@
 # Excel Files
 *.xlsx
-
+*.swp
 *.DS_Store

@@ -7,12 +7,14 @@ import random
 import math
 import sys
 import os
+import matplotlib.pyplot as plt
 
 train_file_path = "../../../testing-data/cifar/data_batch_"
 train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
 for i in range(1,6):
   train_file_name = train_file_path + str(i)
+  print(train_file_name)
   with open(train_file_name, 'rb') as cifar_file:
     data = pickle.load(cifar_file, encoding = 'bytes')
     train_images_raw = np.concatenate((train_images_raw, data[b"data"]), axis = 0)
@@ -32,7 +34,7 @@ fully_connected_nodes = 128
 poolS = 2
 
 # Training information
-nIt = 500
+nIt = 3000
 batchS = 32
 learning_rate = 1e-4
 
@@ -64,10 +66,7 @@ for index, i in enumerate(list_range):
   train_images.append(train_images_raw[i])
   train_labels.append(train_labels_raw[i])
 
-train_images = np.reshape(train_images, [len(train_images)] + size) 
-
 test_images = test[b"data"]
-test_images = np.reshape(test_images, [len(test_images)] + size) 
 test_labels = test[b"labels"]
 
 # Collecting sample both for query and for testing
@@ -76,9 +75,9 @@ def get_samples(class_num, nSupportImgs, testing = False):
   one_hot_list[class_num] = 1.
   samples = 0
   if not testing:
-    imageNum = random.randint(0, train_images.shape[0] - 1)
+    imageNum = random.randint(0, len(train_images) - 1)
   else:
-    imageNum = random.randint(0, test_images.shape[0] - 1)
+    imageNum = random.randint(0, len(test_images) - 1)
   pickedImages = []
   pickedLabels = []
   while samples < nSupportImgs:
@@ -92,10 +91,12 @@ def get_samples(class_num, nSupportImgs, testing = False):
       labelThis = test_labels[imageNum]
     if labelThis == np.argmax(one_hot_list):
       if not testing:
-        imgReshape = np.reshape(train_images[imageNum,:], size)
+        imgReshape = np.reshape(train_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
         pickedLabels.append(train_labels[imageNum])
       else:
-        imgReshape = np.reshape(test_images[imageNum,:], size)
+        imgReshape = np.reshape(test_images[imageNum,:], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
         pickedLabels.append(test_labels[imageNum])
       pickedImages.append(imgReshape)
       samples += 1
