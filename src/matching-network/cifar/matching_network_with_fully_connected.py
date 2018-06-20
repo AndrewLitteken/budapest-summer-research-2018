@@ -48,7 +48,7 @@ if len(sys.argv) > 2:
   numbers = classList[:nClasses]
   numbersTest = classList[10-nClasses:]
 nClasses = len(numbers)
-nImgsSuppClass = 5
+nImgsSuppClass = 2
 
 if len(sys.argv) > 1 and sys.argv[1] != "-":
     base = sys.argv[1] + "/cosine-"
