@@ -11,14 +11,14 @@ import os
 train_file_path = "../../../testing-data/cifar/data_batch_"
 train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
-for i in range(1,5):
+for i in range(1,6):
   train_file_name = train_file_path + str(i)
   with open(train_file_name, 'rb') as cifar_file:
     data = pickle.load(cifar_file, encoding = 'bytes')
     train_images_raw = np.concatenate((train_images_raw, data[b"data"]), axis = 0)
     train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), axis = 0)
 
-test_file_name = "../../../testing-data/cifar/data_batch_5"
+test_file_name = "../../../testing-data/cifar/test_batch"
 with open(test_file_name, 'rb') as cifar_file:
   test = pickle.load(cifar_file, encoding = 'bytes')
 
