@@ -78,6 +78,7 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
         imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
         pickedLabels.append(mnist.train.labels[imageNum, :])
       else:
+        imgReshape = np.reshape(mnist.test.images[imageNum,:], size)
         pickedLabels.append(mnist.test.labels[imageNum, :])
       pickedImages.append(imgReshape)
       samples += 1
