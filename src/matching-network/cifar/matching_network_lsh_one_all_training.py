@@ -2,23 +2,35 @@
 
 import tensorflow as tf
 import numpy as np
+import pickle
 import random
 import math
 import sys
 import os
 from sklearn import svm
 
-# Import data, to be replaced with more flexible importing
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
-  one_hot=True)
+train_file_path = "../../../testing-data/cifar/data_batch_"
+train_images_raw = np.empty((0, 3072))
+train_labels_raw = np.empty((0))
+for i in range(1,6):
+  train_file_name = train_file_path + str(i)
+  with open(train_file_name, 'rb') as cifar_file:
+    data = pickle.load(cifar_file, encoding = 'bytes')
+    train_images_raw = np.concatenate((train_images_raw, data[b"data"]), 
+      axis = 0)
+    train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), 
+      axis = 0)
+
+test_file_name = "../../../testing-data/cifar/test_batch"
+with open(test_file_name, 'rb') as cifar_file:
+  test = pickle.load(cifar_file, encoding = 'bytes')
 
 # Hardware specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
-size = [28, 28, 1]
+size = [32, 32, 3]
 nKernels = [8, 16, 32]
 fully_connected_nodes = 128
 poolS = 2
@@ -27,7 +39,7 @@ poolS = 2
 nIt = 5000
 batchS = 32
 nRandPlanes = 100
-learning_rate = 1e-5
+learning_rate = 1e-8
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]
@@ -46,39 +58,56 @@ period = 1000
 if len(sys.argv) > 2:
   period = int(sys.argv[2])
 
-if len(sys.argv) > 1:
+if len(sys.argv) > 1 and sys.argv[1] != "-":
     base = sys.argv[1] + "/lsh-training-one-all-"
 else:
     base = "/tmp/lsh-training-one-all-"
 
 SAVE_PATH = base + str(period) + "-" + str(nClasses)
 
+train_images = []
+train_labels = []
+list_range = np.arange(len(train_images_raw))
+np.random.shuffle(list_range)
+for index, i in enumerate(list_range):
+  train_images.append(train_images_raw[i])
+  train_labels.append(train_labels_raw[i])
+
+train_images = np.reshape(train_images, [len(train_images)] + size)
+
+test_images = test[b"data"]
+test_images = np.reshape(test_images, [len(test_images)] + size)
+test_labels = test[b"labels"]
+
 # Collecting sample both for query and for testing
-def get_samples(mnistNum, nSupportImgs, testing = False):
+def get_samples(class_num, nSupportImgs, testing = False):
   one_hot_list = [0.] * 10
-  one_hot_list[mnistNum] = 1.
+  one_hot_list[class_num] = 1.
   samples = 0
   if not testing:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, len(train_images) - 1)
   else:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, len(test_images) - 1)
   pickedImages = []
   pickedLabels = []
   while samples < nSupportImgs:
-    if (imageNum == len(mnist.train.images) and not testing):
+    if (imageNum == len(train_images) and not testing):
       imageNum = 0
-    elif (imageNum == len(mnist.test.images) and testing):
+    elif (imageNum == len(test_images) and testing):
       imageNum = 0
     if not testing:
-      labelThis = mnist.train.labels[imageNum, :]
+      labelThis = train_labels[imageNum]
     else:
-      labelThis = mnist.test.labels[imageNum, :]
-    if np.all(labelThis == one_hot_list):
+      labelThis = test_labels[imageNum]
+    if labelThis == np.argmax(one_hot_list):
       if not testing:
-        imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
-        pickedLabels.append(mnist.train.labels[imageNum, :])
+        imgReshape = np.reshape(train_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
+        pickedLabels.append(train_labels[imageNum])
       else:
-        pickedLabels.append(mnist.test.labels[imageNum, :])
+        imgReshape = np.reshape(test_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
+        pickedLabels.append(test_labels[imageNum])
       pickedImages.append(imgReshape)
       samples += 1
     imageNum += 1
@@ -287,7 +316,6 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
     for index in range(len(feature_vectors)):
       # Append feature vector to list
       x.append(feature_vectors[index])
-
       # Check if the label matches the current label
       if np.array_equal(labels[index], current_label):
         # Append one if yes, indicated we want it above the plane
@@ -296,6 +324,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
         # Append a 0 if not, indicated we want it below the plane
         y.append(0)
 
+
     # Fit the line to the data
     clf = svm.SVC(kernel="linear", C = 1.0)
     clf.fit(x,y)
@@ -303,6 +332,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
     # Add onto the matrix
     lsh_matrix.append(clf.coef_[0])
 
+    print(lsh_matrix[i])
     # Deal with the offset for each plane
     temp_vec = [0]*len(feature_vectors[0])
 
@@ -460,7 +490,8 @@ with tf.Session() as session:
           lsh_offsets: offsets
         })
         TotalAcc += ACC
-      print("Accuracy on the independent test set is: "+str(TotalAcc/float(BatchToTest)) )
+      print("Accuracy on the independent test set is: "+str(TotalAcc/
+        float(BatchToTest)) )
    
     # Rework the planes ever period iterations
     if (step % period) == 0:  

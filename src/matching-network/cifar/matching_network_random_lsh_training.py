@@ -2,6 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
+import pickle
 import random
 import math
 import sys
@@ -14,8 +15,10 @@ for i in range(1,6):
   train_file_name = train_file_path + str(i)
   with open(train_file_name, 'rb') as cifar_file:
     data = pickle.load(cifar_file, encoding = 'bytes')
-    train_images_raw = np.concatenate((train_images_raw, data[b"data"]), axis = 0)
-    train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), axis = 0)
+    train_images_raw = np.concatenate((train_images_raw, data[b"data"]), 
+      axis = 0)
+    train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), 
+      axis = 0)
 
 test_file_name = "../../../testing-data/cifar/test_batch"
 with open(test_file_name, 'rb') as cifar_file:
@@ -26,7 +29,7 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
-size = [28, 28, 1]
+size = [32, 32, 3]
 nKernels = [8, 16, 32]
 fully_connected_nodes = 128
 poolS = 2
@@ -35,7 +38,7 @@ poolS = 2
 nIt = 5000
 batchS = 32
 nPlanes = 100
-learning_rate = 1e-5
+learning_rate = 1e-9
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]
@@ -56,7 +59,7 @@ if len(sys.argv) > 2:
 if len(sys.argv) > 1:
     base = sys.argv[1] + "/cifar-lsh-training-random-"
 else:
-    base = "/tmp/lsh-training-random-"
+    base = "/tmp/cifar-lsh-training-random-"
 
 SAVE_PATH = base + str(nClasses)
 if len(sys.argv) > 4:
@@ -79,14 +82,14 @@ test_images = np.reshape(test_images, [len(test_images)] + size)
 test_labels = test[b"labels"]
 
 # Collecting sample both for query and for testing
-def get_samples(mnistNum, nSupportImgs, testing = False):
+def get_samples(class_num, nSupportImgs, testing = False):
   one_hot_list = [0.] * 10
-  one_hot_list[mnistNum] = 1.
+  one_hot_list[class_num] = 1.
   samples = 0
   if not testing:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, len(train_images) - 1)
   else:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, len(test_images) - 1)
   pickedImages = []
   pickedLabels = []
   while samples < nSupportImgs:
@@ -100,10 +103,12 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
       labelThis = test_labels[imageNum]
     if labelThis == np.argmax(one_hot_list):
       if not testing:
-        imgReshape = np.reshape(train_images[imageNum,:], size)
+        imgReshape = np.reshape(train_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
         pickedLabels.append(train_labels[imageNum])
       else:
-        imgReshape = np.reshape(test_images[imageNum,:], size)
+        imgReshape = np.reshape(test_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
         pickedLabels.append(test_labels[imageNum])
       pickedImages.append(imgReshape)
       samples += 1
@@ -196,7 +201,7 @@ def generate_lsh_planes(features, nPlanes):
       tf.constant(0.5)), tf.constant(2.0)), trainable=training)
 
     offset = tf.get_variable('offsets', initializer = tf.zeros([nPlanes], 
-      tf.float32))
+      tf.float32), trainable = False)
 
   return plane, offset
 
@@ -257,10 +262,12 @@ supports = tf.stack(support_list)
 k = -1.0
 with tf.name_scope("loss"):
   # Multiply the query by the supports
+  #query_repeat = tf.Print(query_repeat, [query_repeat], summarize = 200, message = "query")
+  #supports = tf.Print(supports, [supports], summarize = 200)
   signed = tf.multiply(query_repeat, supports)
-  sigmoid = tf.divide(tf.constant(1.0), tf.clip_by_value(tf.add(
-  tf.constant(1.0), tf.exp(tf.multiply(tf.constant(k), signed))), 
-  1e-10, float("inf")))
+  #signed = tf.Print(signed, [signed], summarize = 200)
+  sigmoid = tf.divide(tf.constant(1.0), tf.add(tf.constant(1.0), tf.exp(tf.multiply(tf.constant(k), signed))))
+  #sigmoid = tf.Print(sigmoid, [sigmoid], summarize = 200)
 
   # Sum the sigmoid values to ge the similarity
   similarity = tf.reduce_sum(sigmoid, [3])
@@ -271,8 +278,13 @@ with tf.name_scope("loss"):
   # Find the maximum similarty in each class
   max_similarity = tf.reduce_max(similarity, 2)
  
-  loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(
-    logits=mean_similarity, labels=q_label))
+  #softmax = tf.nn.softmax(mean_similarity)
+  #softmax = tf.Print(softmax, [softmax, tf.log(softmax + tf.constant(1e-10))], summarize = 300)
+  #loss = -tf.reduce_sum(tf.cast(q_label, tf.float32) * tf.log(softmax + tf.constant(1e-10)))
+  q_label = tf.stop_gradient(q_label)
+  cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
+    logits=mean_similarity, labels=q_label)
+  loss = tf.reduce_sum(cross_entropy)
 
 # Optimizer
 with tf.name_scope("optimizer"):
@@ -325,7 +337,8 @@ with tf.Session() as session:
     queryImgBatch = np.asarray(queryImgBatch)
     
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict =
+    #ACC, LOSS, OPT = session.run([accuracy, loss], feed_dict =
+    ACC, LOSS = session.run([accuracy, loss], feed_dict =
       {s_imgs: suppImgs, 
        q_img: queryImgBatch,
        q_label: queryLabelBatch
