@@ -17,10 +17,8 @@ train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
 with open(train_file_path, 'rb') as cifar_file:
   data = pickle.load(cifar_file, encoding = 'bytes')
-  train_images_raw = np.concatenate((train_images_raw, data[b"data"]), 
-    axis = 0)
-  train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), 
-    axis = 0)
+  train_images_raw = data[b"data"]
+  train_labels_raw = data[b"fine_labels"]
 
 test_file_name = "../../../testing-data/cifar-100/test"
 with open(test_file_name, 'rb') as cifar_file:
@@ -57,7 +55,7 @@ while len(numbers) < nClasses:
 while len(numbersTest) < nClasses:
   selected_val = random.randint(0, 99)
   if selected_val not in numbersTest and selected_val not in numbers:
-    numbers.append(selected_val)   
+    numbersTest.append(selected_val)   
 
 nImgsSuppClass = 5
 
@@ -86,12 +84,10 @@ train_images = np.reshape(train_images, [len(train_images)] + size)
 
 test_images = test[b"data"]
 test_images = np.reshape(test_images, [len(test_images)] + size)
-test_labels = test[b"labels"]
+test_labels = test[b"fine_labels"]
 
 # Collecting sample both for query and for testing
 def get_samples(class_num, nSupportImgs, testing = False):
-  one_hot_list = [0.] * 10
-  one_hot_list[class_num] = 1.
   samples = 0
   if not testing:
     imageNum = random.randint(0, len(train_images) - 1)
@@ -108,7 +104,7 @@ def get_samples(class_num, nSupportImgs, testing = False):
       labelThis = train_labels[imageNum]
     else:
       labelThis = test_labels[imageNum]
-    if labelThis == np.argmax(one_hot_list):
+    if labelThis == class_num:
       if not testing:
         imgReshape = np.reshape(train_images[imageNum], [3,32,32])
         imgReshape = np.transpose(imgReshape, [1,2,0])
@@ -313,6 +309,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
   lsh_matrix = []
   lsh_offset_vals = []
 
+  print("Creating Planes")
   # Iterate through the numbers and generate a plane that separates that
   # class from the rest of the values
   for i in range(len(numbers)):
@@ -325,6 +322,8 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
     for index in range(len(feature_vectors)):
       # Append feature vector to list
       x.append(feature_vectors[index])
+      if float("inf") in feature_vectors[index] or float("nan") in feature_vectors[index]:
+        print(feature_vectors)
       # Check if the label matches the current label
       if np.array_equal(labels[index], current_label):
         # Append one if yes, indicated we want it above the plane
@@ -333,15 +332,15 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
         # Append a 0 if not, indicated we want it below the plane
         y.append(0)
 
-
+    print("fitting planes")
     # Fit the line to the data
     clf = svm.SVC(kernel="linear", C = 1.0)
     clf.fit(x,y)
+    print("fitting planes complete")
 
     # Add onto the matrix
     lsh_matrix.append(clf.coef_[0])
 
-    print(lsh_matrix[i])
     # Deal with the offset for each plane
     temp_vec = [0]*len(feature_vectors[0])
 

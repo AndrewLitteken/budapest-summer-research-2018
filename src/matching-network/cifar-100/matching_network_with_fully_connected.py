@@ -37,7 +37,7 @@ poolS = 2
 nIt = 5000
 batchS = 32
 nRandPlanes = 100
-learning_rate = 1e-8
+learning_rate = 1e-6
 
 # Support and testing information
 nClasses = 3

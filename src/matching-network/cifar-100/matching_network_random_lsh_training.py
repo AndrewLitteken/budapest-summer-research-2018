@@ -16,10 +16,8 @@ train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
 with open(train_file_path, 'rb') as cifar_file:
   data = pickle.load(cifar_file, encoding = 'bytes')
-  train_images_raw = np.concatenate((train_images_raw, data[b"data"]), 
-    axis = 0)
-  train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), 
-    axis = 0)
+  train_images_raw = data[b"data"]
+  train_labels_raw = data[b"fine_labels"]
 
 test_file_name = "../../../testing-data/cifar-100/test"
 with open(test_file_name, 'rb') as cifar_file:
@@ -38,7 +36,7 @@ poolS = 2
 # Training Infomration
 nIt = 5000
 batchS = 32
-nRandPlanes = 100
+nPlanes = 100
 learning_rate = 1e-8
 
 # Support and testing information
@@ -56,7 +54,7 @@ while len(numbers) < nClasses:
 while len(numbersTest) < nClasses:
   selected_val = random.randint(0, 99)
   if selected_val not in numbersTest and selected_val not in numbers:
-    numbers.append(selected_val)
+    numbersTest.append(selected_val)
     
 nImgsSuppClass = 5
 
@@ -88,12 +86,10 @@ train_images = np.reshape(train_images, [len(train_images)] + size)
 
 test_images = test[b"data"]
 test_images = np.reshape(test_images, [len(test_images)] + size)
-test_labels = test[b"labels"]
+test_labels = test[b"fine_labels"]
 
 # Collecting sample both for query and for testing
 def get_samples(class_num, nSupportImgs, testing = False):
-  one_hot_list = [0.] * 10
-  one_hot_list[class_num] = 1.
   samples = 0
   if not testing:
     imageNum = random.randint(0, len(train_images) - 1)
@@ -110,7 +106,7 @@ def get_samples(class_num, nSupportImgs, testing = False):
       labelThis = train_labels[imageNum]
     else:
       labelThis = test_labels[imageNum]
-    if labelThis == np.argmax(one_hot_list):
+    if labelThis == class_num:
       if not testing:
         imgReshape = np.reshape(train_images[imageNum], [3,32,32])
         imgReshape = np.transpose(imgReshape, [1,2,0])
