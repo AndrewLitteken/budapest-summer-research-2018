@@ -62,7 +62,7 @@ nImgsSuppClass = 5
 # Plane Training information
 nPickedPlanes = len(numbers)
 period = 1000
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 and sys.argv[2] != "-":
   period = int(sys.argv[2])
 
 if len(sys.argv) > 1 and sys.argv[1] != "-":
