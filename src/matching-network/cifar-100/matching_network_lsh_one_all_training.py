@@ -8,6 +8,9 @@ import math
 import sys
 import os
 from sklearn import svm
+import cifar_100
+
+cifar_100.get_data()
 
 train_file_path = "../../../testing-data/cifar-100/train"
 train_images_raw = np.empty((0, 3072))
