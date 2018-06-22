@@ -3,3 +3,4 @@
 *.swp
 *.DS_Store
 *testing-data/cifar-100
+*__pycache__
