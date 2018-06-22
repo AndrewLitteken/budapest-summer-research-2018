@@ -1,4 +1,4 @@
-# Checking viability of LSH with random planes
+# Checking viability of LSH with random planes CIFAR-100
 
 import tensorflow as tf
 import numpy as np
@@ -6,28 +6,68 @@ import random
 import math
 import sys
 import os
+import pickle
+import cifar_100
 
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
-  one_hot=True)
+cifar_100.get_data()
+
+train_file_path = "../../../testing-data/cifar-100/train"
+train_images_raw = np.empty((0, 3072))
+train_labels_raw = np.empty((0))
+with open(train_file_path, 'rb') as cifar_file:
+  data = pickle.load(cifar_file, encoding = 'bytes')
+  train_images_raw = data[b"data"]
+  train_labels_raw = data[b"fine_labels"]
+
+test_file_name = "../../../testing-data/cifar-100/test"
+with open(test_file_name, 'rb') as cifar_file:
+  test = pickle.load(cifar_file, encoding = 'bytes')
+
+# Hardware Specifications
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
-size = [28, 28, 1]
+size = [32, 32, 3]
 nKernels = [8, 16, 32]
 fully_connected_nodes = 128
 poolS = 2
 
-# LSH Testing
-nSupp = 30
+#Training information
+batchS = 32
+nPlanes = 100
+
+nClasses = 10
+nSuppImgs = 5
 nSupportTraining = 10000
-MAX_SLOPE = 10
-nPlanes = 500
 nTrials = 1000
+nSupp = nClasses * nSuppImgs
+excluded_numbers = []
+
+numbers = []
+while len(numbers) < nClasses:
+  selected_class = random.randint(0, 99)
+  while selected_class in numbers or selected_class in excluded_numbers:
+    selected_class = random.randint(0, 99)
+  numbers.append(selected_class)
 
 if len(sys.argv) < 2:
   print("no model provided")
   exit()
 SAVE_PATH = sys.argv[1]
+
+train_images = []
+train_labels = []
+list_range = np.arange(len(train_images_raw))
+np.random.shuffle(list_range)
+for index, i in enumerate(list_range):
+  train_images.append(train_images_raw[i])
+  train_labels.append(train_labels_raw[i])
+
+train_images = np.reshape(train_images, [len(train_images)] + size)
+
+test_images = test[b"data"]
+test_labels = test[b"fine_labels"]
 
 tf.reset_default_graph()
 
@@ -124,55 +164,65 @@ with tf.Session() as session:
  
   # for these, we may want to just feed through all of the mnist data for 
   # the feature vectors
-  rawDataset = np.reshape(mnist.train.images, [mnist.train.images.shape[0]] 
-    + size)
-  rawLabels = mnist.train.labels
+  rawDataset = np.reshape(train_images, [train_images.shape[0]] 
+    + [3, 32, 32])
+  rawDataset = np.transpose(rawDataset, [0, 2, 3, 1])
+  rawLabels = train_labels
   
-  featureVectors = np.empty([55000, fully_connected_nodes])
-  for i in range(55):
+  featureVectors = np.empty([len(rawDataset), fully_connected_nodes])
+  for i in range(int(len(rawDataset)/1000)):
     FEAT = (session.run([features], feed_dict = 
       {dataset: rawDataset[i*1000:(i+1)*1000]}))
     FEAT = np.asarray(FEAT)
     featureVectors[i*1000:(i+1)*1000] = FEAT[0]
 
-  queryDataset = np.reshape(mnist.test.images, 
-    [mnist.test.images.shape[0]]+size)
-  queryLabels = mnist.test.labels
+  queryDataset = np.reshape(test_images, [test_images.shape[0]]
+    + [3, 32, 32])
+  queryDataset = np.transpose(queryDataset, [0, 2, 3, 1])
+  queryLabels = test_labels
   
-  queryFeatureVectors = np.empty([10000, fully_connected_nodes])
-  for i in range(10):
+  queryFeatureVectors = np.empty([len(queryDataset), fully_connected_nodes])
+  for i in range(int(len(queryDataset)/1000)):
     FEAT = (session.run([features], feed_dict = 
       {dataset: queryDataset[i*1000:(i+1)*1000]}))
     FEAT = np.asarray(FEAT)
     queryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-
-lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
-  featureVectors[:nSupportTraining], rawLabels)
 
 sumEff = 0
 
 cos_acc = 0
 lsh_acc = 0
 lsh_acc2 = 0
+
+# choose random support vectors
+supp = []
+supp_labels = []
+for j in numbers:
+  n = 0
+  while n < nSuppImgs:
+    supp_index = random.randint(0, train_images.shape[0] - 1)
+    while int(train_labels[supp_index]) != j:
+      supp_index += 1
+      if supp_index == len(train_images):
+        supp_index = 0
+    n += 1
+    supp.append(featureVectors[supp_index])
+    supp_labels.append(int(train_labels[supp_index]))
+
+lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
+  supp, supp_labels)
+
 for i in range(nTrials):
   
-  # choose random support vectors
-  supp = []
-  supp_labels = []
-  occurences = np.zeros(10)
-  for j in range(nSupp):
-    supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-    while (occurences[np.argmax(mnist.train.labels[supp_index])] > 0 
-      and 0 in occurences):
-      supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-    supp.append(featureVectors[supp_index])
-    supp_labels.append(np.argmax(mnist.train.labels[supp_index]))
-    occurences[np.argmax(mnist.train.labels[supp_index])] += 1
-  
   # choose random query
-  query_index = random.randint(0, mnist.test.images.shape[0] - 1)
+  query_value = random.choice(numbers)
+  query_index = random.randint(0, test_images.shape[0] - 1)
+  while query_value != int(queryLabels[query_index]):
+    query_index += 1
+    if query_index == len(test_images):
+      query_index = 0
   query = queryFeatureVectors[query_index]
-  query_label = np.argmax(queryLabels[query_index])
+  query_label = queryLabels[query_index]
   
   # get lsh binaries (from application to matrix) for supp and query
   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
