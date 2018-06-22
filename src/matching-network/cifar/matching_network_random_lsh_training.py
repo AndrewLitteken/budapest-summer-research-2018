@@ -1,4 +1,4 @@
-# Using Random LSH Planes training in a matching network
+# Using Random LSH Planes training in a matching network CIFAR
 
 import tensorflow as tf
 import numpy as np
