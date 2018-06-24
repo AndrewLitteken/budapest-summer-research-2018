@@ -67,10 +67,12 @@ for index, i in enumerate(list_range):
   train_images.append(train_images_raw[i])
   train_labels.append(train_labels_raw[i])
 
-train_images = np.reshape(train_images, [len(train_images)] + size)
+train_images = np.reshape(train_images, [len(train_images)] + [3, 32, 32])
+train_images = np.transpose(train_images, [0, 2, 3, 1]) 
 
 test_images = test[b"data"]
-test_images = np.reshape(test_images, [len(test_images)] + size)
+test_images = np.reshape(test_images, [len(test_images)] + [3, 32, 32])
+test_images = np.transpose(test_images, [0, 2, 3, 1]) 
 test_labels = test[b"labels"]
 
 tf.reset_default_graph()

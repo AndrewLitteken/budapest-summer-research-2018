@@ -12,6 +12,9 @@ mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
   one_hot=True)
 
 
+train_images = mnist.train.images
+train_labels = mnist.train.labels
+
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
@@ -39,78 +42,11 @@ nClasses = len(numbers)
 nImgsSuppClass = 5
 
 if len(sys.argv) > 1:
-    base = sys.argv[1] + "/cosine-"
+    base = sys.argv[1] + "/mnist-cnn-"
 else:
-    base = "/tmp/cosine-"
+    base = "/tmp/mnist-cnn-"
 
 SAVE_PATH = base + str(nClasses)
-
-# Collecting sample both for query and for testing
-def get_samples(mnistNum, nSupportImgs, testing = False):
-  one_hot_list = [0.] * 10
-  one_hot_list[mnistNum] = 1.
-  samples = 0
-  if not testing:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
-  else:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
-  pickedImages = []
-  pickedLabels = []
-  while samples < nSupportImgs:
-    if (imageNum == len(mnist.train.images) and not testing):
-      imageNum = 0
-    elif (imageNum == len(mnist.test.images) and testing):
-      imageNum = 0
-    if not testing:
-      labelThis = mnist.train.labels[imageNum, :]
-    else:
-      labelThis = mnist.test.labels[imageNum, :]
-    if np.all(labelThis == one_hot_list):
-      if not testing:
-        imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
-        pickedLabels.append(mnist.train.labels[imageNum, :])
-      else:
-        imgReshape = np.reshape(mnist.test.images[imageNum,:], size)
-        pickedLabels.append(mnist.test.labels[imageNum, :])
-      pickedImages.append(imgReshape)
-      samples += 1
-    imageNum += 1
-  return pickedImages, pickedLabels
-
-# Get several images
-def get_support(test=False):
-  supportImgs = []
-  
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
-  
-  for support in choices:
-    newSupportImgs, newSupportLabels = get_samples(support, nImgsSuppClass,
-      test)
-    supportImgs.append(newSupportImgs)
-  
-  return supportImgs
-
-# Get a single query value
-def get_query(test=False):
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
-  imageInd = random.randint(0, len(choices) - 1)
-  imageNum = choices[imageInd]
-  img, label = get_samples(imageNum, 1)
-  l=np.zeros(len(choices))
-  l[imageInd]=1		
-  return img[0], l
-
-tf.reset_default_graph()
-
-# Support information - matrix
-# Dimensions: batch size, n classes, n supp imgs / class
-s_imgs = tf.placeholder(tf.float32, [batchS, nClasses, nImgsSuppClass]+size)
 
 # Query Information - vector
 q_img = tf.placeholder(tf.float32, [batchS]+size) # batch size, size
@@ -145,56 +81,19 @@ def create_network(img, size, First = False):
     CurrentShape=currInp.get_shape()
     FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
     FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,128])
+    W = tf.get_variable('W',[FeatureLength,len(numbers)])
     FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[128])
+    Bias = tf.get_variable('Bias',[len(numbers)])
     FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [batchS,128,1,1])
+    FC = tf.reshape(FC, [batchS,len(numbers)])
   
   return FC
 
 # Call the network created above on the qury
-query_features = create_network(q_img, size, First = True)
-
-support_list = []
-query_list = []
-
-# Go through each class and each support image in that class
-for k in range(nClasses):
-  slist=[]
-  qlist=[]
-  for i in range(nImgsSuppClass):
-    slist.append(create_network(s_imgs[:, k, i, :, :, :], size))
-    qlist.append(query_features)
-  slist = tf.stack(slist)
-  qlist = tf.stack(qlist) 
-  support_list.append(slist)
-  query_list.append(qlist)
-
-# Make a stack to compare the query to every support
-query_repeat = tf.stack(query_list)
-supports = tf.stack(support_list)
-
-# Loss
-# Cosine distance calculation  
-# Application of softmax  
-# Minimize loss
+network_result = create_network(q_img, size)
 
 with tf.name_scope("loss"):
-  dotProduct = tf.reduce_sum(tf.multiply(query_repeat, supports), [3,4,5])
-  supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(supports), [3,4,5]))
-  cosDist = dotProduct / tf.clip_by_value(supportsMagn, 1e-10, float("inf"))
-  
-  cosDist = tf.transpose(cosDist,[2,0,1])
-
-  # Find the average cosine distance per class
-  MeanCosDist= tf.reduce_mean(cosDist,2)
-  # fnd the maximum cosine distance per class
-  MaxCostDist = tf.reduce_max(cosDist,2)
-
-  loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits_v2(
-    logits = MeanCosDist, labels = q_label))
-
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = q_label, logits = network_result))
 # Optimizer
 with tf.name_scope("optimizer"):
   optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
@@ -202,15 +101,8 @@ with tf.name_scope("optimizer"):
 # Accuracy and Equality Distribution
 
 with tf.name_scope("accuracy"):
-  # Find the closest class
-  max_class = tf.argmax(MaxCostDist, 1)
-  # Find whihc class was supposed to be the closest
-  max_label = tf.argmax(q_label, 1)  
-  
-  # Compare the values
-  total = tf.equal(max_class, max_label) 
-  # Find on average, how many were correct
-  accuracy = tf.reduce_mean(tf.cast(total, tf.float32))
+  correct_predictions = tf.equal(tf.argmax(network_result, 1), tf.argmax(q_label, 1))
+  accuracy = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
 
 # Session
 
@@ -226,29 +118,35 @@ with tf.Session() as session:
   step = 1
   while step < nIt:
     step = step + 1
-  
-    suppImgs = []
-
-    # Get support values for each batch  
-    for j in range(batchS):
-      suppImgsOne = get_support(False)
-      suppImgs.append(suppImgsOne)
-    suppImgs = np.asarray(suppImgs)
-
-    # Get query value for each batch
     queryImgBatch = []
     queryLabelBatch = []
+    occurrences = np.zeros(len(numbers))
     for i in range(batchS):
-      qImg, qLabel = get_query(False)
+      selected_class = random.randint(0, (len(numbers) - 1))
+      while occurrences[selected_class] > 0 and 0 in occurrences:
+        selected_class = random.randint(0, (len(numbers) - 1))
+
+      occurrences[selected_class] += 1
+
+      selected_sample = random.randint(0, len(train_images) - 1)
+      while np.argmax(train_labels[selected_sample]) != selected_class:
+        selected_sample += 1
+        if selected_sample == len(train_images):
+          selected_sample = 0
+      qImg = train_images[selected_sample]
+      qLabel_int = int(np.argmax(train_labels[selected_sample]))
+      qLabel = np.zeros(len(numbers))
+      qLabel[qLabel_int] = 1
+
       queryImgBatch.append(qImg)
       queryLabelBatch.append(qLabel)
     queryLabelBatch = np.asarray(queryLabelBatch)
     queryImgBatch = np.asarray(queryImgBatch)
+    queryImgBatch = np.reshape(queryImgBatch, [batchS] + size)
 
     # Run the session with the optimizer
     ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict =
-      {s_imgs: suppImgs, 
-       q_img: queryImgBatch,
+      {q_img: queryImgBatch,
        q_label: queryLabelBatch
       })
 
@@ -257,73 +155,4 @@ with tf.Session() as session:
       print("ITER: "+str(step))
       print("ACC: "+str(ACC))
       print("LOSS: "+str(LOSS))
-      print("------------------------")
- 
-    # Run an additional test set
-    if (step%1000) == 0:
-      TotalAcc=0.0
-      #run ten batches to test accuracy
-      BatchToTest=10
-      for repeat in range(BatchToTest):
-	      suppImgs = []
-
-        # Get supports	  
-	      for j in range(batchS):
-	      	suppImgsOne = get_support(False)
-	      	suppImgs.append(suppImgsOne)
-	      suppImgs = np.asarray(suppImgs)
-
-        # Get queries
-	      queryImgBatch = []
-	      queryLabelBatch = []
-	      for i in range(batchS):
-	      	qImg, qLabel = get_query(False)
-	      	queryImgBatch.append(qImg)
-	      	queryLabelBatch.append(qLabel)
-	      queryLabelBatch = np.asarray(queryLabelBatch)
-	      queryImgBatch = np.asarray(queryImgBatch)
-
-        # Run session for test values
-	      ACC, LOSS = session.run([accuracy, loss], feed_dict = 
-          {s_imgs: suppImgs, 
-		       q_img: queryImgBatch,
-		       q_label: queryLabelBatch
-		      })
-
-	      TotalAcc+=ACC
-        
-      print("Accuracy on the independent test set is: "+
-        str(TotalAcc/float(BatchToTest)))
-
-  # Save out the model once complete
-  save_path = Saver.save(session, SAVE_PATH, step)
-  print("Model saved in path: %s" % SAVE_PATH)
-  
-  # Use the test set
-  sumAcc = 0.0
-  for k in range(0,100):
-    suppImgs = []
-  
-    # Get test support values 
-    for j in range(batchS):
-      suppImgsOne = get_support(True)
-      suppImgs.append(suppImgsOne)
-    suppImgs = np.asarray(suppImgs)
-  
-    # Get test queries
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(True)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-      
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
-    a = session.run(accuracy, feed_dict = {s_imgs: suppImgs, 
-                                           q_img: queryImgBatch,
-                                           q_label: queryLabelBatch
-                                           })
-    sumAcc += a
-    
-  print("Independent Test Set: "+str(float(sumAcc)/100))
+      print("--------------------")
