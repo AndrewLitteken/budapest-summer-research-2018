@@ -14,8 +14,8 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 def make_dir_list(data_dir):
-  path_train = "{}/images_background/".format(data_dir)
-  path_test = "{}/images_evaluation/".format(data_dir)
+  path_train = "{}images_background/".format(data_dir)
+  path_test = "{}images_evaluation/".format(data_dir)
 
   train_dirs = []
   test_dirs = []
@@ -55,12 +55,14 @@ else:
 
 SAVE_PATH = base + str(nClasses)
 
+train_dirs, test_dirs = make_dir_list(train_file_path) 
+
 # Collecting sample both for query and for testing
 def get_samples(data_dir, nSupportImgs):
   
   img_names = []
   for file_name in os.listdir(data_dir):
-    img_names.append("{}{}".format(data_dir, file_name)
+    img_names.append("{}{}".format(data_dir, file_name))
 
   img_names = np.asarray(img_names)
   selected_indices = np.arange(len(img_names))
@@ -68,7 +70,6 @@ def get_samples(data_dir, nSupportImgs):
   img_names = np.asarray(img_names)[selected_indices]
 
   picked_images = []
-  
 
   return pickedImages
 
@@ -77,11 +78,11 @@ def get_support(test=False):
   supportImgs = []
   
   if test:
-    choices = numbersTest
+    choices = test_images
   else:
-    choices = numbers
+    choices = train_images
   
-  for support in choices:
+  for :
     newSupportImgs, newSupportLabels = get_samples(support, nImgsSuppClass,
       test)
     supportImgs.append(newSupportImgs)
@@ -136,17 +137,7 @@ def create_network(img, size, First = False):
         strides=[1,poolS,poolS,1], padding="SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,128])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[128])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [batchS,128,1,1])
-  
-  return FC
+  return currInp
 
 # Call the network created above on the qury
 query_features = create_network(q_img, size, First = True)

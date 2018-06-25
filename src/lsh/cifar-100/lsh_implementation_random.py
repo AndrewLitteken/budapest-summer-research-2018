@@ -37,8 +37,8 @@ poolS = 2
 batchS = 32
 nPlanes = 100
 
-nClasses = 10
-nSuppImgs = 1
+nClasses = 5
+nSuppImgs = 5
 nSupportTraining = 10000
 nTrials = 1000
 nSupp = nClasses * nSuppImgs
