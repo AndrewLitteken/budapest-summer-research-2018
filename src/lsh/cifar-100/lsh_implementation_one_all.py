@@ -186,7 +186,6 @@ def lsh_dist(lshSupp, lshQueryO, lshVecSupp, lshVecQuery):
   dist = np.sum(dist.astype(int), 1)
   dist_2 = np.multiply(lshVecSupp, lshQuery2)
   dist2 = np.divide(1.0, np.add(1.0, np.exp(np.multiply(-50.0, dist_2))))
-  print(dist2)
   dist2 = np.sum(dist2, 1)  # check this!
   return dist, dist2
 

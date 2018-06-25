@@ -25,7 +25,7 @@ fully_connected_nodes = 128
 poolS = 2
 
 # Training information
-nIt = 5000
+nIt = 10000
 batchS = 32
 learning_rate = 1e-4
 

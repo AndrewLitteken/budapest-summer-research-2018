@@ -180,17 +180,7 @@ def create_network(img, size, First = False):
         strides = [1,poolS,poolS,1], padding = "SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,fully_connected_nodes])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[fully_connected_nodes])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [batchS,fully_connected_nodes,1,1])
-  
-  return FC
+  return currInp
 
 def generate_lsh_planes(features, nPlanes):
   with tf.variable_scope('lshPlanes', reuse=tf.AUTO_REUSE) as varscope:

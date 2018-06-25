@@ -26,12 +26,12 @@ batchS = 32
 nPlanes = 500 
 
 nClasses = 10
-nSuppImgs = 5 
+nSuppImgs = 20 
 nSupportTraining = 10000
 nTrials = 1000
 nSupp = nClasses * nSuppImgs
 
-numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
+numbers = [8, 9, 0]
 excluded_numbers = []
 while len(numbers) < nClasses:
   selected_class = random.randint(0, 9)
