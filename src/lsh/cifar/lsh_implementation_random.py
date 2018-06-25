@@ -97,17 +97,7 @@ def create_network(img, size, First = False):
         padding="SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,fully_connected_nodes])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[fully_connected_nodes])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [-1,fully_connected_nodes])
-  
-  return FC
+  return currInp
 
 features = create_network(dataset, size)
 
