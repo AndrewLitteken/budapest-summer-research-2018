@@ -156,3 +156,6 @@ with tf.Session() as session:
       print("ACC: "+str(ACC))
       print("LOSS: "+str(LOSS))
       print("--------------------")
+
+  save_path = Saver.save(session, SAVE_PATH, step)
+  print("Model saved in path: %s" % SAVE_PATH)

@@ -35,7 +35,7 @@ nKernels = [8, 16, 32]
 poolS = 2
 
 # Training Infomration
-nIt = 5000
+nIt = 100000
 batchS = 32
 nRandPlanes = 100
 learning_rate = 1e-4
@@ -191,82 +191,44 @@ with tf.Session() as session:
       print("ACC: "+str(ACC))
       print("LOSS: "+str(LOSS))
       print("------------------------")
- 
-    '''# Run an additional test set 
-    if (step%1000) == 0:
-      TotalAcc=0.0
-      #run ten batches to test accuracy
-      BatchToTest=10
-      for repeat in range(BatchToTest):
-        suppImgs = []
-    
-        # Get supports
-        for j in range(batchS):
-          suppImgsOne, suppLabelsOne = get_support(False)
-          suppImgs.append(suppImgsOne)
-        suppImgs = np.asarray(suppImgs)
 
-        # Get queries
-        queryImgBatch = []
-        queryLabelBatch = []
-        for i in range(batchS):
-          qImg, qLabel = get_query(False)
-          queryImgBatch.append(qImg)
-          queryLabelBatch.append(qLabel)
-        queryLabelBatch = np.asarray(queryLabelBatch)
-        queryImgBatch = np.asarray(queryImgBatch)
-        
-        # Run session for test values
-        ACC, LOSS = session.run([accuracy, loss], feed_dict
-        ={s_imgs: suppImgs, 
-          q_img: queryImgBatch,
-          q_label: queryLabelBatch,
-          lsh_planes: planes,
-          lsh_offsets: offsets
-        })
-        TotalAcc += ACC
-      print("Accuracy on the independent test set is: "+str(TotalAcc/
-        float(BatchToTest)) )
-   
-    # Rework the planes ever period iterations
-    if (step % period) == 0:  
-      SFV = np.transpose(SFV, (1, 0, 2))
-      new_feature_vectors = np.reshape(SFV, (SFV.shape[0]*SFV.shape[1], -1))
-      labels = np.reshape(new_labels, (new_labels.shape[0] * 
-        new_labels.shape[1], -1))
-      planes, offsets = gen_lsh_pick_planes(10, new_feature_vectors, labels)
- 
-  # Save out the model once complete
   save_path = Saver.save(session, SAVE_PATH, step)
   print("Model saved in path: %s" % SAVE_PATH)
-  
+ 
   sumAcc = 0.0
 
   # Use the test set 
   for k in range(0,100):
-    suppImgs = []
- 
-    # Get test support values 
-    for j in range(batchS):
-      suppImgsOne, suppLabelsOne = get_support(True)
-      suppImgs.append(suppImgsOne)
-    suppImgs = np.asarray(suppImgs)
-  
-    # Get test queries
     queryImgBatch = []
     queryLabelBatch = []
+    occurrences = np.zeros(len(numbers))
     for i in range(batchS):
-      qImg, qLabel = get_query(True)
+      selected_class = random.randint(0, (len(numbers) - 1))
+      while occurrences[selected_class] > 0 and 0 in occurrences:
+        selected_class = random.randint(0, (len(numbers) - 1))
+      
+      occurrences[selected_class] += 1     
+ 
+      selected_sample = random.randint(0, len(test_images) - 1) 
+      while test_labels[selected_sample] != selected_class:
+        selected_sample += 1
+        if selected_sample == len(test_images):
+          selected_sample = 0
+      qImg = test_images[selected_sample]
+      qLabel_int = int(test_labels[selected_sample])
+      qLabel = np.zeros(len(numbers))
+      qLabel[qLabel_int] = 1
+
       queryImgBatch.append(qImg)
       queryLabelBatch.append(qLabel)
     queryLabelBatch = np.asarray(queryLabelBatch)
     queryImgBatch = np.asarray(queryImgBatch)
-    a = session.run(accuracy, feed_dict = {s_imgs: suppImgs, 
-                                           q_img: queryImgBatch,
+    
+ 
+    
+    a = session.run(accuracy, feed_dict = {q_img: queryImgBatch,
                                            q_label: queryLabelBatch,
-                                           lsh_planes: random_planes,
-                                           lsh_offsets: blank_offsets
                                           })
     sumAcc += a
     
-  print("Independent Test Set: "+str(float(sumAcc)/100))'''
+  print("Independent Test Set: "+str(float(sumAcc)/100))

@@ -46,9 +46,10 @@ nTrials = 1000
 nSupp = nClasses * nSuppImgs
 
 numbers = []
+excluded_numbers = []
 while len(numbers) < nClasses:
   selected_class = random.randint(0, 9)
-  while selected_class in numbers:
+  while selected_class in numbers or selected_class in excluded_numbers:
     selected_class = random.randint(0, 9)
   numbers.append(selected_class)
 
@@ -65,10 +66,12 @@ for index, i in enumerate(list_range):
   train_images.append(train_images_raw[i])
   train_labels.append(train_labels_raw[i])
 
-train_images = np.reshape(train_images, [len(train_images)] + size)
+train_images = np.reshape(train_images, [len(train_images), 3, 32, 32])
+train_images = np.transpose(train_images, [0, 2, 3, 1])
 
 test_images = test[b"data"]
-test_images = np.reshape(test_images, [len(test_images)] + size)
+test_images = np.reshape(test_images, [len(test_images), 3, 32, 32])
+test_images = np.transpose(test_images, [0, 2, 3, 1])
 test_labels = test[b"labels"]
 
 tf.reset_default_graph()
@@ -98,17 +101,7 @@ def create_network(img, size, First = False):
         padding="SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,fully_connected_nodes])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[fully_connected_nodes])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [-1,fully_connected_nodes])
-  
-  return FC
+  return currInp
 
 features = create_network(dataset, size)
 
@@ -174,7 +167,6 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
   return lsh_matrix, lsh_offset_vals
 
 def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
-  feature_vectors = np.reshape(feature_vectors, (-1, fully_connected_nodes))
   lsh_vectors = np.matmul(feature_vectors, np.transpose(LSH_matrix))
   lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
   lsh_bin = np.sign(lsh_vectors)
@@ -205,30 +197,31 @@ with tf.Session() as session:
   Saver = tf.train.Saver()
   Saver.restore(session, SAVE_PATH)
  
-  # for these, we may want to just feed through all of the mnist data
-  rawDataset = np.reshape(train_images, [train_images.shape[0]] 
-    + [3, 32, 32])
-  rawDataset = np.transpose(rawDataset, [0, 2, 3, 1])
+  rawDataset = train_images
   rawLabels = train_labels
-  
-  featureVectors = np.empty([len(rawDataset), fully_connected_nodes])
+
+  featureVectors = None
   for i in range(int(len(rawDataset)/1000)):
-    FEAT = (session.run([features], feed_dict = 
+    FEAT = (session.run([features], feed_dict =
       {dataset: rawDataset[i*1000:(i+1)*1000]}))
     FEAT = np.asarray(FEAT)
+    if featureVectors is None:
+      featureVectors = np.empty([len(rawDataset), FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
     featureVectors[i*1000:(i+1)*1000] = FEAT[0]
+  featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
 
-  queryDataset = np.reshape(test_images, [test_images.shape[0]]
-    + [3, 32, 32])
-  queryDataset = np.transpose(queryDataset, [0, 2, 3, 1])
+  queryDataset = test_images
   queryLabels = test_labels
-  
-  queryFeatureVectors = np.empty([len(queryDataset), fully_connected_nodes])
+
+  queryFeatureVectors = None
   for i in range(int(len(queryDataset)/1000)):
-    FEAT = (session.run([features], feed_dict = 
+    FEAT = (session.run([features], feed_dict =
       {dataset: queryDataset[i*1000:(i+1)*1000]}))
     FEAT = np.asarray(FEAT)
+    if queryFeatureVectors is None:
+      queryFeatureVectors = np.empty([len(queryDataset), FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
     queryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+  queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))  
 
 #lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
 #  featureVectors[:100], rawLabels)
