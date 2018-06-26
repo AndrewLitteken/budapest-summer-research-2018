@@ -1,4 +1,4 @@
-# Using Cosine Distance to train a matching network
+# Using Cosine Distance to train a matching network omniglot
 
 import tensorflow as tf
 import numpy as np
