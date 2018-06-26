@@ -50,7 +50,9 @@ learning_rate = 1e-4
 nClasses = 5
 if len(sys.argv) > 2 and sys.argv[2] != "-":
   nClasses = int(sys.argv[2])
-nImgsSuppClass = 1
+nImgsSuppClass = 5
+if len(sys.argv) > 3 and sys.argv[3] != "-":
+  nImgsSuppClass = int(sys.argv[3])
 
 if len(sys.argv) > 1 and sys.argv[1] != "-":
     base = sys.argv[1] + "/omniglot-cosine-"
@@ -222,6 +224,7 @@ with tf.Session() as session:
   
   step = 1
   while step < nIt:
+    print(step)
     step = step + 1
   
     suppImgs = []
@@ -263,32 +266,33 @@ with tf.Session() as session:
       #run ten batches to test accuracy
       BatchToTest=10
       for repeat in range(BatchToTest):
-	      suppImgs = []
-
-        # Get supports	  
-	      for j in range(batchS):
-	      	suppImgsOne = get_support(False)
-	      	suppImgs.append(suppImgsOne)
-	      suppImgs = np.asarray(suppImgs)
-
-        # Get queries
-	      queryImgBatch = []
-	      queryLabelBatch = []
-	      for i in range(batchS):
-	      	qImg, qLabel = get_query(False)
-	      	queryImgBatch.append(qImg)
-	      	queryLabelBatch.append(qLabel)
-	      queryLabelBatch = np.asarray(queryLabelBatch)
-	      queryImgBatch = np.asarray(queryImgBatch)
+        suppImgs = []
+        suppLabels = []
+        # Get support values for each batch  
+        for j in range(batchS):
+          suppImgsOne, suppLabelsOne = get_support(False)
+          suppImgs.append(suppImgsOne)
+          suppLabels.append(suppLabelsOne)
+        suppImgs = np.asarray(suppImgs)
+        suppLabels = np.asarray(suppLabels)
+        # Get query value for each batch
+        queryImgBatch = []
+        queryLabelBatch = []
+        for i in range(batchS):
+          qImg, qLabel = get_query(suppLabels[i], False)
+          queryImgBatch.append(qImg)
+          queryLabelBatch.append(qLabel)
+        queryLabelBatch = np.asarray(queryLabelBatch)
+        queryImgBatch = np.asarray(queryImgBatch)
 
         # Run session for test values
-	      ACC, LOSS = session.run([accuracy, loss], feed_dict = 
-          {s_imgs: suppImgs, 
+        ACC, LOSS = session.run([accuracy, loss], feed_dict = 
+         {s_imgs: suppImgs, 
 		       q_img: queryImgBatch,
 		       q_label: queryLabelBatch
 		      })
 
-	      TotalAcc+=ACC
+        TotalAcc+=ACC
         
       print("Accuracy on the independent test set is: "+
         str(TotalAcc/float(BatchToTest)))
@@ -301,21 +305,21 @@ with tf.Session() as session:
   sumAcc = 0.0
   for k in range(0,100):
     suppImgs = []
-  
-    # Get test support values 
+    suppLabels = []
+    # Get support values for each batch  
     for j in range(batchS):
-      suppImgsOne = get_support(True)
+      suppImgsOne, suppLabelsOne = get_support(True)
       suppImgs.append(suppImgsOne)
+      suppLabels.append(suppLabelsOne)
     suppImgs = np.asarray(suppImgs)
-  
-    # Get test queries
+    suppLabels = np.asarray(suppLabels)
+    # Get query value for each batch
     queryImgBatch = []
     queryLabelBatch = []
     for i in range(batchS):
-      qImg, qLabel = get_query(True)
+      qImg, qLabel = get_query(suppLabels[i], True)
       queryImgBatch.append(qImg)
       queryLabelBatch.append(qLabel)
-      
     queryLabelBatch = np.asarray(queryLabelBatch)
     queryImgBatch = np.asarray(queryImgBatch)
     a = session.run(accuracy, feed_dict = {s_imgs: suppImgs, 
