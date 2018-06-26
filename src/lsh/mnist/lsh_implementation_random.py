@@ -11,6 +11,10 @@ from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
   one_hot=True)
 
+# Hardware Specifications
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
+
 # Graph Constants
 size = [28, 28, 1]
 nKernels = [8, 16, 32]
@@ -18,11 +22,22 @@ fully_connected_nodes = 128
 poolS = 2
 
 # LSH Testing
-nSupp = 30
+batchS = 32
+nPlanes = 500 
+
+nClasses = 10
+nSuppImgs = 20 
 nSupportTraining = 10000
-MAX_SLOPE = 10
-nPlanes = 500
 nTrials = 1000
+nSupp = nClasses * nSuppImgs
+
+numbers = [8, 9, 0]
+excluded_numbers = []
+while len(numbers) < nClasses:
+  selected_class = random.randint(0, 9)
+  while selected_class in numbers or selected_class in excluded_numbers:
+    selected_class = random.randint(0, 9)
+  numbers.append(selected_class)
 
 if len(sys.argv) < 2:
   print("no model provided")
@@ -56,17 +71,7 @@ def create_network(img, size, First = False):
         padding="SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,fully_connected_nodes])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[fully_connected_nodes])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [-1,fully_connected_nodes])
-  
-  return FC
+  return currInp
 
 features = create_network(dataset, size)
 
@@ -83,7 +88,7 @@ def cos_similarities(supports, query):
 # size of the feature vector our network outputs) by the number of planes.
 # Random planes with slopes between -1 and 1
 def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
-  return np.transpose((np.matlib.rand(fully_connected_nodes, num_planes) 
+  return np.transpose((np.matlib.rand(feature_vectors.shape[-1], num_planes) 
     - 0.5) * 2), np.zeros(num_planes)
   
     # lsh_offset_vals.append(np.dot(clf.intercept_[0], clf.coef_[0]))
@@ -91,7 +96,6 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
 
 # Calculate Hash for the feature vector
 def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
-  feature_vectors = np.reshape(feature_vectors, (-1, fully_connected_nodes))
   lsh_vectors = np.matmul(feature_vectors, np.transpose(LSH_matrix))
   lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
   lsh_bin = np.sign(lsh_vectors)
@@ -128,23 +132,29 @@ with tf.Session() as session:
     + size)
   rawLabels = mnist.train.labels
   
-  featureVectors = np.empty([55000, fully_connected_nodes])
-  for i in range(55):
-    FEAT = (session.run([features], feed_dict = 
+  featureVectors = None
+  for i in range(int(len(rawDataset)/1000)):
+    FEAT = (session.run([features], feed_dict =
       {dataset: rawDataset[i*1000:(i+1)*1000]}))
     FEAT = np.asarray(FEAT)
+    if featureVectors is None:
+      featureVectors = np.empty([len(rawDataset), FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
     featureVectors[i*1000:(i+1)*1000] = FEAT[0]
+  featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))
 
   queryDataset = np.reshape(mnist.test.images, 
     [mnist.test.images.shape[0]]+size)
   queryLabels = mnist.test.labels
-  
-  queryFeatureVectors = np.empty([10000, fully_connected_nodes])
-  for i in range(10):
-    FEAT = (session.run([features], feed_dict = 
+
+  queryFeatureVectors = None
+  for i in range(int(len(queryDataset)/1000)):
+    FEAT = (session.run([features], feed_dict =
       {dataset: queryDataset[i*1000:(i+1)*1000]}))
     FEAT = np.asarray(FEAT)
+    if queryFeatureVectors is None:
+      queryFeatureVectors = np.empty([len(queryDataset), FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
     queryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+  queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))  
 
 lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
   featureVectors[:nSupportTraining], rawLabels)
@@ -154,21 +164,23 @@ sumEff = 0
 cos_acc = 0
 lsh_acc = 0
 lsh_acc2 = 0
-for i in range(nTrials):
-  
-  # choose random support vectors
-  supp = []
-  supp_labels = []
-  occurences = np.zeros(10)
-  for j in range(nSupp):
+
+# choose random support vectors
+supp = []
+supp_labels = []
+for j in numbers: 
+  n = 0 
+  while n < nSuppImgs:
     supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-    while (occurences[np.argmax(mnist.train.labels[supp_index])] > 0 
-      and 0 in occurences):
-      supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
+    while int(np.argmax(mnist.train.labels[supp_index])) != j:
+      supp_index += 1
+      if supp_index == len(mnist.train.images):
+        supp_index = 0
+    n += 1  
     supp.append(featureVectors[supp_index])
-    supp_labels.append(np.argmax(mnist.train.labels[supp_index]))
-    occurences[np.argmax(mnist.train.labels[supp_index])] += 1
-  
+    supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
+
+for i in range(nTrials):
   # choose random query
   query_index = random.randint(0, mnist.test.images.shape[0] - 1)
   query = queryFeatureVectors[query_index]

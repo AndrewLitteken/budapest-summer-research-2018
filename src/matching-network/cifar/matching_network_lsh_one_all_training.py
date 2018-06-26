@@ -160,7 +160,7 @@ q_img = tf.placeholder(tf.float32, [batchS]+size) # batch size, size
 q_label = tf.placeholder(tf.int32, [batchS, len(numbers)]) 
 
 # Plane information: size of final layer, number of planes
-lsh_planes = tf.placeholder(tf.float32, [fully_connected_nodes, None])
+lsh_planes = tf.placeholder(tf.float32, [None, None])
 lsh_offsets = tf.placeholder(tf.float32, [None])
 
 # Network Function
@@ -187,17 +187,7 @@ def create_network(img, size, First = False):
         strides=[1,poolS,poolS,1], padding="SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,fully_connected_nodes])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[fully_connected_nodes])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [batchS,fully_connected_nodes,1,1])
-  
-  return FC
+  return currInp
 
 # Call the network created above on the query
 query_features = create_network(q_img, size, First = True)
@@ -332,7 +322,6 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
     # Add onto the matrix
     lsh_matrix.append(clf.coef_[0])
 
-    print(lsh_matrix[i])
     # Deal with the offset for each plane
     temp_vec = [0]*len(feature_vectors[0])
 
@@ -396,6 +385,7 @@ with tf.Session() as session:
   # Generate blank offsets
   blank_offsets = np.zeros(nRandPlanes)
 
+  print("here")
   # Run the session with these planes, the planes do not truly affect the
   # result it is just to keep everything simpler
   SFV, QF = session.run([support_feature_vectors, query_features], feed_dict

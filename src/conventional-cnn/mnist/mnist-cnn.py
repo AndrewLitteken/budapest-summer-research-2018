@@ -25,7 +25,7 @@ fully_connected_nodes = 128
 poolS = 2
 
 # Training information
-nIt = 5000
+nIt = 10000
 batchS = 32
 learning_rate = 1e-4
 
@@ -156,3 +156,6 @@ with tf.Session() as session:
       print("ACC: "+str(ACC))
       print("LOSS: "+str(LOSS))
       print("--------------------")
+
+  save_path = Saver.save(session, SAVE_PATH, step)
+  print("Model saved in path: %s" % SAVE_PATH)

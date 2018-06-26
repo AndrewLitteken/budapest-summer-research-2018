@@ -59,6 +59,8 @@ else:
 
 SAVE_PATH = base + str(nClasses)
 
+train_dirs, test_dirs = make_dir_list(train_file_path) 
+
 # Collecting sample both for query and for testing
 def get_samples(data_dir, nSupportImgs):
   
