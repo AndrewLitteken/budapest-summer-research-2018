@@ -259,6 +259,9 @@ with tf.Session() as session:
       print("ACC: "+str(ACC))
       print("LOSS: "+str(LOSS))
       print("------------------------")
+
+    if step % 500 == 0:
+      save_path = Saver.save(session, SAVE_PATH, step)
  
     # Run an additional test set
     if (step%1000) == 0:
