@@ -3,10 +3,12 @@
 import tensorflow as tf
 import numpy as np
 from scipy import misc
+from skimage import transform, io
 import random
 import math
 import sys
 import os
+import scipy.misc
 
 train_file_path = "../../../testing-data/omniglot/"
 
@@ -14,8 +16,8 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 def make_dir_list(data_dir):
-  path_train = "{}/images_background/".format(data_dir)
-  path_test = "{}/images_evaluation/".format(data_dir)
+  path_train = "{}images_background/".format(data_dir)
+  path_test = "{}images_evaluation/".format(data_dir)
 
   train_dirs = []
   test_dirs = []
@@ -31,6 +33,8 @@ def make_dir_list(data_dir):
 
   return np.asarray(train_dirs), np.asarray(test_dirs)
 
+train_images, test_images = make_dir_list(train_file_path)
+
 # Graph Constants
 size = [28, 28, 1]
 nKernels = [8, 16, 32]
@@ -44,11 +48,11 @@ learning_rate = 1e-4
 
 # Support and testing infromation
 nClasses = 5
-if len(sys.argv) > 2 and sys.arv[2] != "-":
+if len(sys.argv) > 2 and sys.argv[2] != "-":
   nClasses = int(sys.argv[2])
-nImgsSuppClass = 5
+nImgsSuppClass = 1
 
-if len(sys.argv) > 1:
+if len(sys.argv) > 1 and sys.argv[1] != "-":
     base = sys.argv[1] + "/omniglot-cosine-"
 else:
     base = "/tmp/omniglot-cosine-"
@@ -60,44 +64,50 @@ def get_samples(data_dir, nSupportImgs):
   
   img_names = []
   for file_name in os.listdir(data_dir):
-    img_names.append("{}{}".format(data_dir, file_name)
+    img_names.append("{}/{}".format(data_dir, file_name))
 
   img_names = np.asarray(img_names)
-  selected_indices = np.arange(len(img_names))
-  selected_indices = np.random.shuffle(selected_indices)[0:nSupportImgs]
-  img_names = np.asarray(img_names)[selected_indices]
+  np.random.shuffle(img_names)
 
+  selected_samples = []
   picked_images = []
-  
+  while len(selected_samples) < nImgsSuppClass:
+    picked_image_name = random.choice(img_names)
+    while picked_image_name in selected_samples:
+      picked_image_name = random.choice(img_names)
+    picked_image = io.imread(picked_image_name)
+    image_resize = transform.resize(picked_image, size)
+    picked_images.append(image_resize)
+    selected_samples.append(picked_image_name)
 
-  return pickedImages
+  return picked_images
 
 # Get several images
 def get_support(test=False):
   supportImgs = []
   
   if test:
-    choices = numbersTest
+    choices = test_images
   else:
-    choices = numbers
+    choices = train_images
   
-  for support in choices:
-    newSupportImgs, newSupportLabels = get_samples(support, nImgsSuppClass,
-      test)
+  characters = []
+  while len(characters) < nClasses:
+    choice = random.choice(choices)
+    while choice in characters:
+      choice = random.choice(choices)
+    characters.append(choice)
+    newSupportImgs = get_samples(choice, 1)
     supportImgs.append(newSupportImgs)
   
-  return supportImgs
+  return supportImgs, characters
 
 # Get a single query value
-def get_query(test=False):
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
-  imageInd = random.randint(0, len(choices) - 1)
-  imageNum = choices[imageInd]
-  img, label = get_samples(imageNum, 1)
-  l=np.zeros(len(choices))
+def get_query(available_chars, test=False):
+  imageInd = random.randint(0, len(available_chars) - 1) 
+  image_name = available_chars[imageInd]
+  img = get_samples(image_name, 1)
+  l=np.zeros(len(available_chars))
   l[imageInd]=1		
   return img[0], l
 
@@ -110,7 +120,7 @@ s_imgs = tf.placeholder(tf.float32, [batchS, nClasses, nImgsSuppClass]+size)
 # Query Information - vector
 q_img = tf.placeholder(tf.float32, [batchS]+size) # batch size, size
 # batch size, number of categories
-q_label = tf.placeholder(tf.int32, [batchS, len(numbers)])
+q_label = tf.placeholder(tf.int32, [batchS, None])
 
 # Network Function
 # Call for each support image (row of the support matrix) and for the  query 
@@ -136,17 +146,7 @@ def create_network(img, size, First = False):
         strides=[1,poolS,poolS,1], padding="SAME")
       currInp = poolR
   
-  with tf.variable_scope('FC', reuse = tf.AUTO_REUSE) as varscope:
-    CurrentShape=currInp.get_shape()
-    FeatureLength = int(CurrentShape[1]*CurrentShape[2]*CurrentShape[3])
-    FC = tf.reshape(currInp, [-1,FeatureLength])
-    W = tf.get_variable('W',[FeatureLength,128])
-    FC = tf.matmul(FC, W)
-    Bias = tf.get_variable('Bias',[128])
-    FC = tf.add(FC, Bias)
-    FC = tf.reshape(FC, [batchS,128,1,1])
-  
-  return FC
+  return currInp
 
 # Call the network created above on the qury
 query_features = create_network(q_img, size, First = True)
@@ -223,18 +223,19 @@ with tf.Session() as session:
     step = step + 1
   
     suppImgs = []
-
+    suppLabels = []
     # Get support values for each batch  
     for j in range(batchS):
-      suppImgsOne = get_support(False)
+      suppImgsOne, suppLabelsOne = get_support(False)
       suppImgs.append(suppImgsOne)
+      suppLabels.append(suppLabelsOne)
     suppImgs = np.asarray(suppImgs)
-
+    suppLabels = np.asarray(suppLabels)
     # Get query value for each batch
     queryImgBatch = []
     queryLabelBatch = []
     for i in range(batchS):
-      qImg, qLabel = get_query(False)
+      qImg, qLabel = get_query(suppLabels[i], False)
       queryImgBatch.append(qImg)
       queryLabelBatch.append(qLabel)
     queryLabelBatch = np.asarray(queryLabelBatch)
