@@ -1,4 +1,4 @@
-# Using One versus All LSH training in a matching network
+# Using One versus All LSH training in a matching network OMNIGLOT
 
 import tensorflow as tf
 import numpy as np
@@ -61,9 +61,9 @@ if len(sys.argv) > 3 and sys.argv[3] != "-":
   nImgsSuppClass = int(sys.argv[3])
 
 if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/omniglot-lsh-random-"
+    base = sys.argv[1] + "/omniglot-lsh-one-all-"
 else:
-    base = "/tmp/omniglot-lsh-random-"
+    base = "/tmp/omniglot-lsh-one-all-"
 
 SAVE_PATH = base + str(nClasses)
 
