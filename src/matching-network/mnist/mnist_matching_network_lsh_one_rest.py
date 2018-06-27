@@ -25,6 +25,8 @@ poolS = 2
 
 # Training Infomration
 nIt = 5000
+if len(sys.argv) > 5 and sys.argv[5] != "-":
+  nIt = int(sys.argv[5])
 check = 1000
 batchS = 32
 nRandPlanes = 100

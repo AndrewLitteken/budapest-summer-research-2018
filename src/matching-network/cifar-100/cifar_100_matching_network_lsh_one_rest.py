@@ -38,7 +38,7 @@ poolS = 2
 nIt = 5000
 if len(sys.argv) > 5 and sys.argv[5] != "-":
   nIt = int(sys.argv[5])
-check = 50
+check = 1000
 batchS = 32
 nRandPlanes = 100
 learning_rate = 1e-8
@@ -48,18 +48,11 @@ nClasses = 3
 if len(sys.argv) > 3 and sys.argv[3] != "-":
   nClasses = int(sys.argv[3])
 
-numbers = []
-while len(numbers) < nClasses:
-  selected_val = random.randint(0, 79)
-  if selected_val not in numbers:
-    numbers.append(selected_val)  
-
 nImgsSuppClass = 5
 if len(sys.argv) > 4 and sys.argv[4] != "-":
   nImgsSuppClass = int(sys.argv[4])
 
 # Plane Training information
-nPickedPlanes = len(numbers)
 period = 1000
 if len(sys.argv) > 2 and sys.argv[2] != "-":
   period = int(sys.argv[2])
@@ -71,20 +64,14 @@ else:
 
 SAVE_PATH = base + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
-SAVE_PATH += "-("
-for index, number in enumerate(numbers):
-  if index != 0:
-    SAVE_PATH += ","
-  SAVE_PATH += str(number)
-SAVE_PATH += ")"
-
 train_images = []
 train_labels = []
 list_range = np.arange(len(train_images_raw))
 np.random.shuffle(list_range)
 for index, i in enumerate(list_range):
-  train_images.append(train_images_raw[i])
-  train_labels.append(train_labels_raw[i])
+  if train_labels_raw[i] < 80:
+    train_images.append(train_images_raw[i])
+    train_labels.append(train_labels_raw[i])
 
 train_images = np.reshape(train_images, [len(train_images)] + size)
 
@@ -93,62 +80,47 @@ test_images = np.reshape(test_images, [len(test_images)] + size)
 test_labels = test[b"fine_labels"]
 
 # Collecting sample both for query and for testing
-def get_samples(class_num, nSupportImgs, testing = False):
-  samples = 0
-  if not testing:
-    imageNum = random.randint(0, len(train_images) - 1)
-  else:
-    imageNum = random.randint(0, len(test_images) - 1)
-  pickedImages = []
-  pickedLabels = []
-  while samples < nSupportImgs:
-    if (imageNum == len(train_images) and not testing):
-      imageNum = 0
-    elif (imageNum == len(test_images) and testing):
-      imageNum = 0
-    if not testing:
-      labelThis = train_labels[imageNum]
-    else:
-      labelThis = test_labels[imageNum]
-    if labelThis == class_num:
-      if not testing:
-        imgReshape = np.reshape(train_images[imageNum], [3,32,32])
-        imgReshape = np.transpose(imgReshape, [1,2,0])
-        pickedLabels.append(train_labels[imageNum])
-      else:
-        imgReshape = np.reshape(test_images[imageNum], [3,32,32])
-        imgReshape = np.transpose(imgReshape, [1,2,0])
-        pickedLabels.append(test_labels[imageNum])
-      pickedImages.append(imgReshape)
-      samples += 1
-    imageNum += 1
-  return pickedImages, pickedLabels
+def get_samples(class_num, nSupportImgs):
+  selected_samples = []
+  
+  picked_images = []
+  while len(selected_samples) < nSupportImgs:
+    picked_index = random.randint(0, len(train_labels) - 1)
+    while (class_num != train_labels[picked_index] or 
+      picked_index in selected_samples):
+      picked_index = random.randint(0, len(train_labels) - 1)
+    imgReshape = np.reshape(train_images[picked_index], [3,32,32])
+    imgReshape = np.transpose(imgReshape, [1,2,0])
+    picked_images.append(imgReshape)
+    selected_samples.append(picked_index)
+
+  return picked_images
 
 # Get several images
 def get_support(test=False):
   supportImgs = []
-  supportLabels = []
   
-  choices = numbers
+  choices = train_labels
   
-  for index, support in enumerate(choices):
-    newSupportImgs, newSupportLabels = get_samples(support, nImgsSuppClass,
-      test)
+  images = []
+  while len(images) < nClasses:
+    choice = random.choice(choices)
+    while choice in images:
+      choice = random.choice(choices)
+    images.append(choice)
+    newSupportImgs = get_samples(choice, nImgsSuppClass)
     supportImgs.append(newSupportImgs)
-    l = np.zeros(len(choices))
-    l[index] = 1
-    supportLabels.append(l)  
-
-  return supportImgs, supportLabels
+  
+  return supportImgs, images
 
 # Get a single query value
-def get_query(test=False):
-  choices = numbers
+def get_query(available_images, test=False):
+  choices = available_images
   imageInd = random.randint(0, len(choices) - 1)
   imageNum = choices[imageInd]
-  img, label = get_samples(imageNum, 1, test)
+  img = get_samples(imageNum, 1)
   l=np.zeros(len(choices))
-  l[imageInd]=1    
+  l[imageInd]=1   
   return img[0], l
 
 tf.reset_default_graph()
@@ -162,7 +134,7 @@ s_imgs = tf.placeholder(tf.float32, [batchS, nClasses, nImgsSuppClass]+size)
 # Query Information - vector
 q_img = tf.placeholder(tf.float32, [batchS]+size) # batch size, size
 # batch size, number of categories
-q_label = tf.placeholder(tf.int32, [batchS, len(numbers)]) 
+q_label = tf.placeholder(tf.int32, [batchS, None]) 
 
 # Plane information: size of final layer, number of planes
 lsh_planes = tf.placeholder(tf.float32, [None, None])
@@ -298,15 +270,14 @@ with tf.name_scope("accuracy"):
 def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
   lsh_matrix = []
   lsh_offset_vals = []
+  
+  feature_vectors = np.reshape(np.asarray(feature_vectors),
+    (len(feature_vectors), -1))
 
-  print("Creating Planes")
-  # Iterate through the numbers and generate a plane that separates that
-  # class from the rest of the values
-  for i in range(len(numbers)):
+  label_dirs = set(np.reshape(labels, -1))
+  for index_i, i in enumerate(label_dirs):
     x = []
     y = []
-    current_label = [0.] * len(numbers)
-    current_label[i] = 1.
 
     # go through feature vectors
     for index in range(len(feature_vectors)):
@@ -315,7 +286,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
       if float("inf") in feature_vectors[index] or float("nan") in feature_vectors[index]:
         print(feature_vectors)
       # Check if the label matches the current label
-      if np.array_equal(labels[index], current_label):
+      if labels[index] == i:
         # Append one if yes, indicated we want it above the plane
         y.append(1)
       else:
@@ -338,7 +309,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
         break
 
     # Apply matrix to offset values 
-    temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[i])
+    temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[index_i])
     lsh_offset_vals.append(temp_mul)
 
   # Adjust the shape
@@ -359,7 +330,7 @@ def get_next_batch(test = False):
   queryImgBatch = []
   queryLabelBatch = []
   for i in range(batchS):
-    qImg, qLabel = get_query(test)
+    qImg, qLabel = get_query(suppLabels[i], test)
     queryImgBatch.append(qImg)
     queryLabelBatch.append(qLabel)
   queryLabelBatch = np.asarray(queryLabelBatch)

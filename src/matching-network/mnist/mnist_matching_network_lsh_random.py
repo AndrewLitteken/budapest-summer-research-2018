@@ -24,6 +24,9 @@ poolS = 2
 
 #Training information
 nIt = 5000
+if len(sys.argv) > 6 and sys.argv[6] != "-":
+  nIt = int(sys.argv[6])
+
 check = 1000
 batchS = 32
 nPlanes = 100

@@ -78,7 +78,7 @@ def get_samples(data_dir, nSupportImgs):
 
   selected_samples = []
   picked_images = []
-  while len(selected_samples) < nImgsSuppClass:
+  while len(selected_samples) < nSupportImgs:
     picked_image_name = random.choice(img_names)
     while picked_image_name in selected_samples:
       picked_image_name = random.choice(img_names)
@@ -101,7 +101,7 @@ def get_support(test=False):
     while choice in characters:
       choice = random.choice(choices)
     characters.append(choice)
-    newSupportImgs = get_samples(choice, 1)
+    newSupportImgs = get_samples(choice, nImgsSuppClass)
     supportImgs.append(newSupportImgs)
   
   return supportImgs, characters

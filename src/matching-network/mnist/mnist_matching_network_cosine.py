@@ -23,6 +23,8 @@ poolS = 2
 
 # Training information
 nIt = 5000
+if len(sys.argv) > 4 and sys.argv[4] != "-":
+  nIt = int(sys.argv[4])
 check = 1000
 batchS = 32
 learning_rate = 1e-4
