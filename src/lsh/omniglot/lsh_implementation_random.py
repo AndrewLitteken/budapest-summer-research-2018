@@ -224,10 +224,10 @@ while len(supp) < nClasses * nSuppImgs:
       supp_index -= 1
       change = -1
     n += 1
-    supp_index += change
     count += 1
     supp.append(featureVectors[supp_index])
     supp_labels.append(test_labels[supp_index])
+    supp_index += change
 
 for i in range(nTrials):
   # choose random query

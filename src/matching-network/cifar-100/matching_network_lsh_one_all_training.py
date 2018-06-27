@@ -165,7 +165,7 @@ q_img = tf.placeholder(tf.float32, [batchS]+size) # batch size, size
 q_label = tf.placeholder(tf.int32, [batchS, len(numbers)]) 
 
 # Plane information: size of final layer, number of planes
-lsh_planes = tf.placeholder(tf.float32, [fully_connected_nodes, None])
+lsh_planes = tf.placeholder(tf.float32, [None, None])
 lsh_offsets = tf.placeholder(tf.float32, [None])
 
 # Network Function
@@ -347,6 +347,47 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
   lsh_matrix = np.transpose(lsh_matrix)
   return lsh_matrix, lsh_offset_vals
 
+def get_next_batch():
+  suppImgs = []
+  suppLabels = []
+  # Get support values for each batch  
+  for j in range(batchS):
+    suppImgsOne, suppLabelsOne = get_support(False)
+    suppImgs.append(suppImgsOne)
+    suppLabels.append(suppLabelsOne)
+  suppImgs = np.asarray(suppImgs)
+  suppLabels = np.asarray(suppLabels)
+  # Get query value for each batch
+  queryImgBatch = []
+  queryLabelBatch = []
+  for i in range(batchS):
+    qImg, qLabel = get_query(False)
+    queryImgBatch.append(qImg)
+    queryLabelBatch.append(qLabel)
+  queryLabelBatch = np.asarray(queryLabelBatch)
+  queryImgBatch = np.asarray(queryImgBatch)
+
+  return suppImgs, suppLabels, queryImgBatch, queryLabelBatch
+
+def remake_planes(suppLabels, SFV):
+  new_labels = []
+  for i in range(len(suppLabels)):
+    new_labels.append([])
+    for j in range(len(suppLabels[0])):
+      for k in range(nImgsSuppClass):
+        new_labels[i].append(suppLabels[i][j])  
+     
+  new_labels = np.asarray(new_labels)
+
+  # Reshape the support vectos for our use
+  SFV = np.transpose(SFV, (1, 0, 2))
+  new_feature_vectors = np.reshape(SFV, (SFV.shape[0]*SFV.shape[1], -1))
+  labels = np.reshape(new_labels, (new_labels.shape[0] * new_labels.shape[1], -1))
+  # Pick the planes based off of the sprad created by the initial network
+  planes, offsets = gen_lsh_pick_planes(10, new_feature_vectors, labels)
+
+  return planes, offsets
+
 # Session
 
 # Initialize the vairables we start with
@@ -358,36 +399,8 @@ with tf.Session() as session:
   # Create a save location
   Saver = tf.train.Saver()  
 
-  # Get initial set of support images
-  suppImgs = []
-  suppLabels = []
-  for j in range(batchS):
-    suppImgsOne, suppLabelsOne = get_support(False)
-    suppImgs.append(suppImgsOne)
-    suppLabels.append(suppLabelsOne)
-  suppImgs = np.asarray(suppImgs)
-  suppLabels = np.asarray(suppLabels)
+  suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
 
-  # Adjust the labels for use in SVM
-  new_labels = []
-  for i in range(len(suppLabels)):
-    new_labels.append([])
-    for j in range(len(suppLabels[0])):
-      for k in range(10):
-        new_labels[i].append(suppLabels[i][j])  
-     
-  new_labels = np.asarray(new_labels)
-
-  # Find a query value
-  queryImgBatch = []
-  queryLabelBatch = []
-  for i in range(batchS):
-    qImg, qLabel = get_query(False)
-    queryImgBatch.append(qImg)
-    queryLabelBatch.append(qLabel)
-  queryLabelBatch = np.asarray(queryLabelBatch)
-  queryImgBatch = np.asarray(queryImgBatch)
- 
   # Generate some random planes with slope values between 1 and -1
   random_planes = (np.matlib.rand(fully_connected_nodes, nRandPlanes) 
     - 0.5) * 2
@@ -404,39 +417,14 @@ with tf.Session() as session:
       lsh_offsets: blank_offsets
      })
 
-  # Reshape the support vectos for our use
-  SFV = np.transpose(SFV, (1, 0, 2))
-  new_feature_vectors = np.reshape(SFV, (SFV.shape[0]*SFV.shape[1], -1))
-  labels = np.reshape(new_labels, (new_labels.shape[0] * 
-    new_labels.shape[1], -1))
-  
-  # Pick the planes based off of the sprad created by the initial network
-  planes, offsets = gen_lsh_pick_planes(10, new_feature_vectors, labels)
+  planes, offsets = remake_planes(suppLabels, SFV)
 
   step = 1
   while step < nIt:
     step = step + 1
-  
-    suppImgs = []
-    suppLabels = []  
+    print(step)
 
-    # Get support values for each batch
-    for j in range(batchS):
-      suppImgsOne, suppLabelsOne = get_support(False)
-      suppImgs.append(suppImgsOne)
-      suppLabels.append(suppLabelsOne)
-    suppImgs = np.asarray(suppImgs)
-    suppLabels = np.asarray(suppLabels)
-
-    # Get query value for each batch
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(False)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
+    suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
     SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, 
@@ -447,6 +435,10 @@ with tf.Session() as session:
         lsh_planes: planes,
         lsh_offsets: offsets
        })
+
+    # Rework the planes ever period iterations
+    if (step % period) == 0:
+      planes, offsets = remake_planes(suppLabels, SFV)
     
     # Observe Values
     if (step%100) == 0:
@@ -461,24 +453,9 @@ with tf.Session() as session:
       #run ten batches to test accuracy
       BatchToTest=10
       for repeat in range(BatchToTest):
-        suppImgs = []
-    
-        # Get supports
-        for j in range(batchS):
-          suppImgsOne, suppLabelsOne = get_support(False)
-          suppImgs.append(suppImgsOne)
-        suppImgs = np.asarray(suppImgs)
 
-        # Get queries
-        queryImgBatch = []
-        queryLabelBatch = []
-        for i in range(batchS):
-          qImg, qLabel = get_query(False)
-          queryImgBatch.append(qImg)
-          queryLabelBatch.append(qLabel)
-        queryLabelBatch = np.asarray(queryLabelBatch)
-        queryImgBatch = np.asarray(queryImgBatch)
-        
+        suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
+          
         # Run session for test values
         ACC, LOSS = session.run([accuracy, loss], feed_dict
         ={s_imgs: suppImgs, 
@@ -488,23 +465,13 @@ with tf.Session() as session:
           lsh_offsets: offsets
         })
         TotalAcc += ACC
-      print("Accuracy on the independent test set is: "+str(TotalAcc/
-        float(BatchToTest)) )
-   
-    # Rework the planes ever period iterations
-    if (step % period) == 0:  
-      SFV = np.transpose(SFV, (1, 0, 2))
-      new_feature_vectors = np.reshape(SFV, (SFV.shape[0]*SFV.shape[1], -1))
-      labels = np.reshape(new_labels, (new_labels.shape[0] * 
-        new_labels.shape[1], -1))
-      planes, offsets = gen_lsh_pick_planes(10, new_feature_vectors, labels)
+      print("Accuracy on the independent test set is: "+str(TotalAcc/float(BatchToTest)) )
  
   # Save out the model once complete
   save_path = Saver.save(session, SAVE_PATH, step)
   print("Model saved in path: %s" % SAVE_PATH)
   
   sumAcc = 0.0
-
   # Use the test set 
   for k in range(0,100):
     suppImgs = []
