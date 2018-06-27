@@ -43,6 +43,9 @@ poolS = 2
 
 # Training information
 nIt = 3000
+if len(sys.argv) > 4 and sys.argv[4] != "-":
+  nIt = int(sys.argv[4])
+check = 50
 batchS = 32
 learning_rate = 1e-4
 
@@ -59,7 +62,7 @@ if len(sys.argv) > 1 and sys.argv[1] != "-":
 else:
     base = "/tmp/omniglot-cosine-"
 
-SAVE_PATH = base + str(nClasses)
+SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
 
 train_dirs, test_dirs = make_dir_list(train_file_path) 
 
@@ -90,10 +93,7 @@ def get_samples(data_dir, nSupportImgs):
 def get_support(test=False):
   supportImgs = []
   
-  if test:
-    choices = test_images
-  else:
-    choices = train_images
+  choices = train_images
   
   characters = []
   while len(characters) < nClasses:
@@ -213,122 +213,77 @@ with tf.name_scope("accuracy"):
 
 # Session
 
+def get_next_batch(test = False):
+  suppImgs = []
+  suppLabels = []
+  # Get support values for each batch  
+  for j in range(batchS):
+    suppImgsOne, suppLabelsOne = get_support(test)
+    suppImgs.append(suppImgsOne)
+    suppLabels.append(suppLabelsOne)
+  suppImgs = np.asarray(suppImgs)
+  suppLabels = np.asarray(suppLabels)
+  # Get query value for each batch
+  queryImgBatch = []
+  queryLabelBatch = []
+  for i in range(batchS):
+    qImg, qLabel = get_query(suppLabels[i], test)
+    queryImgBatch.append(qImg)
+    queryLabelBatch.append(qLabel)
+  queryLabelBatch = np.asarray(queryLabelBatch)
+  queryImgBatch = np.asarray(queryImgBatch)
+
+  return suppImgs, suppLabels, queryImgBatch, queryLabelBatch
+
+# Session
+
 # Initialize the variables we start with
 init = tf.global_variables_initializer()
 
 with tf.Session() as session:
   session.run(init)
-
-  # Create a save location
-  Saver = tf.train.Saver()  
   
+  # Create a save location
+  Saver = tf.train.Saver()
+
   step = 1
   while step < nIt:
-    print(step)
     step = step + 1
-  
-    suppImgs = []
-    suppLabels = []
-    # Get support values for each batch  
-    for j in range(batchS):
-      suppImgsOne, suppLabelsOne = get_support(False)
-      suppImgs.append(suppImgsOne)
-      suppLabels.append(suppLabelsOne)
-    suppImgs = np.asarray(suppImgs)
-    suppLabels = np.asarray(suppLabels)
-    # Get query value for each batch
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(suppLabels[i], False)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
 
+    suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
+    
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict =
-      {s_imgs: suppImgs, 
-       q_img: queryImgBatch,
-       q_label: queryLabelBatch
-      })
-
+    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+      ={s_imgs: suppImgs, 
+        q_img: queryImgBatch,
+        q_label: queryLabelBatch,
+       })
+    
     # Observe Values
     if (step%100) == 0:
       print("ITER: "+str(step))
       print("ACC: "+str(ACC))
       print("LOSS: "+str(LOSS))
       print("------------------------")
-
-    if step % 500 == 0:
-      save_path = Saver.save(session, SAVE_PATH, step)
  
-    # Run an additional test set
-    if (step%1000) == 0:
+    # Run an additional test set 
+    if (step%check) == 0:
       TotalAcc=0.0
       #run ten batches to test accuracy
       BatchToTest=10
       for repeat in range(BatchToTest):
-        suppImgs = []
-        suppLabels = []
-        # Get support values for each batch  
-        for j in range(batchS):
-          suppImgsOne, suppLabelsOne = get_support(False)
-          suppImgs.append(suppImgsOne)
-          suppLabels.append(suppLabelsOne)
-        suppImgs = np.asarray(suppImgs)
-        suppLabels = np.asarray(suppLabels)
-        # Get query value for each batch
-        queryImgBatch = []
-        queryLabelBatch = []
-        for i in range(batchS):
-          qImg, qLabel = get_query(suppLabels[i], False)
-          queryImgBatch.append(qImg)
-          queryLabelBatch.append(qLabel)
-        queryLabelBatch = np.asarray(queryLabelBatch)
-        queryImgBatch = np.asarray(queryImgBatch)
 
+        suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch(True)
+          
         # Run session for test values
-        ACC, LOSS = session.run([accuracy, loss], feed_dict = 
-         {s_imgs: suppImgs, 
-		       q_img: queryImgBatch,
-		       q_label: queryLabelBatch
-		      })
-
-        TotalAcc+=ACC
-        
-      print("Accuracy on the independent test set is: "+
-        str(TotalAcc/float(BatchToTest)))
-
+        ACC, LOSS = session.run([accuracy, loss], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+        })
+        TotalAcc += ACC
+      print("Accuracy on the independent test set is: "+str(TotalAcc/float(BatchToTest)) )
+ 
   # Save out the model once complete
   save_path = Saver.save(session, SAVE_PATH, step)
   print("Model saved in path: %s" % SAVE_PATH)
-  
-  # Use the test set
-  sumAcc = 0.0
-  for k in range(0,100):
-    suppImgs = []
-    suppLabels = []
-    # Get support values for each batch  
-    for j in range(batchS):
-      suppImgsOne, suppLabelsOne = get_support(True)
-      suppImgs.append(suppImgsOne)
-      suppLabels.append(suppLabelsOne)
-    suppImgs = np.asarray(suppImgs)
-    suppLabels = np.asarray(suppLabels)
-    # Get query value for each batch
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(suppLabels[i], True)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
-    a = session.run(accuracy, feed_dict = {s_imgs: suppImgs, 
-                                           q_img: queryImgBatch,
-                                           q_label: queryLabelBatch
-                                           })
-    sumAcc += a
-    
-  print("Independent Test Set: "+str(float(sumAcc)/100))

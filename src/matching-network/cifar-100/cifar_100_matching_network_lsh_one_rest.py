@@ -1,85 +1,124 @@
-# Using One versus All LSH training in a matching network
+# Using One versus All LSH training in a matching network CIFAR-100
 
 import tensorflow as tf
 import numpy as np
+import pickle
 import random
 import math
 import sys
 import os
 from sklearn import svm
+import cifar_100
 
-# Import data, to be replaced with more flexible importing
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
-  one_hot=True)
+cifar_100.get_data()
+
+train_file_path = "../../../testing-data/cifar-100/train"
+train_images_raw = np.empty((0, 3072))
+train_labels_raw = np.empty((0))
+with open(train_file_path, 'rb') as cifar_file:
+  data = pickle.load(cifar_file, encoding = 'bytes')
+  train_images_raw = data[b"data"]
+  train_labels_raw = data[b"fine_labels"]
+
+test_file_name = "../../../testing-data/cifar-100/test"
+with open(test_file_name, 'rb') as cifar_file:
+  test = pickle.load(cifar_file, encoding = 'bytes')
 
 # Hardware specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
-size = [28, 28, 1]
+size = [32, 32, 3]
 nKernels = [8, 16, 32]
 fully_connected_nodes = 128
 poolS = 2
 
 # Training Infomration
 nIt = 5000
+if len(sys.argv) > 5 and sys.argv[5] != "-":
+  nIt = int(sys.argv[5])
+check = 50
 batchS = 32
 nRandPlanes = 100
-learning_rate = 1e-5
+learning_rate = 1e-8
 
 # Support and testing information
-classList = [1,2,3,4,5,6,7,8,9,0]
-numbers = [1,2,3]
-numbersTest = [8,9,0]
-if len(sys.argv) > 3:
+nClasses = 3
+if len(sys.argv) > 3 and sys.argv[3] != "-":
   nClasses = int(sys.argv[3])
-  numbers = classList[:nClasses]
-  numbersTest = classList[10-nClasses:]
-nClasses = len(numbers)
+
+numbers = []
+while len(numbers) < nClasses:
+  selected_val = random.randint(0, 79)
+  if selected_val not in numbers:
+    numbers.append(selected_val)  
+
 nImgsSuppClass = 5
+if len(sys.argv) > 4 and sys.argv[4] != "-":
+  nImgsSuppClass = int(sys.argv[4])
 
 # Plane Training information
 nPickedPlanes = len(numbers)
 period = 1000
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 and sys.argv[2] != "-":
   period = int(sys.argv[2])
 
-if len(sys.argv) > 1:
-    base = sys.argv[1] + "/lsh-training-one-all-"
+if len(sys.argv) > 1 and sys.argv[1] != "-":
+    base = sys.argv[1] + "/cifar-100-lsh-one-rest-"
 else:
-    base = "/tmp/lsh-training-one-all-"
+    base = "/tmp/cifar-100-lsh-one-rest-"
 
-SAVE_PATH = base + str(period) + "-" + str(nClasses)
+SAVE_PATH = base + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+
+SAVE_PATH += "-("
+for index, number in enumerate(numbers):
+  if index != 0:
+    SAVE_PATH += ","
+  SAVE_PATH += str(number)
+SAVE_PATH += ")"
+
+train_images = []
+train_labels = []
+list_range = np.arange(len(train_images_raw))
+np.random.shuffle(list_range)
+for index, i in enumerate(list_range):
+  train_images.append(train_images_raw[i])
+  train_labels.append(train_labels_raw[i])
+
+train_images = np.reshape(train_images, [len(train_images)] + size)
+
+test_images = test[b"data"]
+test_images = np.reshape(test_images, [len(test_images)] + size)
+test_labels = test[b"fine_labels"]
 
 # Collecting sample both for query and for testing
-def get_samples(mnistNum, nSupportImgs, testing = False):
-  one_hot_list = [0.] * 10
-  one_hot_list[mnistNum] = 1.
+def get_samples(class_num, nSupportImgs, testing = False):
   samples = 0
   if not testing:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, len(train_images) - 1)
   else:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, len(test_images) - 1)
   pickedImages = []
   pickedLabels = []
   while samples < nSupportImgs:
-    if (imageNum == len(mnist.train.images) and not testing):
+    if (imageNum == len(train_images) and not testing):
       imageNum = 0
-    elif (imageNum == len(mnist.test.images) and testing):
+    elif (imageNum == len(test_images) and testing):
       imageNum = 0
     if not testing:
-      labelThis = mnist.train.labels[imageNum, :]
+      labelThis = train_labels[imageNum]
     else:
-      labelThis = mnist.test.labels[imageNum, :]
-    if np.all(labelThis == one_hot_list):
+      labelThis = test_labels[imageNum]
+    if labelThis == class_num:
       if not testing:
-        imgReshape = np.reshape(mnist.train.images[imageNum,:], size)
-        pickedLabels.append(mnist.train.labels[imageNum, :])
+        imgReshape = np.reshape(train_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
+        pickedLabels.append(train_labels[imageNum])
       else:
-        imgReshape = np.reshape(mnist.test.images[imageNum,:], size)
-        pickedLabels.append(mnist.test.labels[imageNum, :])
+        imgReshape = np.reshape(test_images[imageNum], [3,32,32])
+        imgReshape = np.transpose(imgReshape, [1,2,0])
+        pickedLabels.append(test_labels[imageNum])
       pickedImages.append(imgReshape)
       samples += 1
     imageNum += 1
@@ -90,10 +129,7 @@ def get_support(test=False):
   supportImgs = []
   supportLabels = []
   
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
+  choices = numbers
   
   for index, support in enumerate(choices):
     newSupportImgs, newSupportLabels = get_samples(support, nImgsSuppClass,
@@ -107,10 +143,7 @@ def get_support(test=False):
 
 # Get a single query value
 def get_query(test=False):
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
+  choices = numbers
   imageInd = random.randint(0, len(choices) - 1)
   imageNum = choices[imageInd]
   img, label = get_samples(imageNum, 1, test)
@@ -266,6 +299,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
   lsh_matrix = []
   lsh_offset_vals = []
 
+  print("Creating Planes")
   # Iterate through the numbers and generate a plane that separates that
   # class from the rest of the values
   for i in range(len(numbers)):
@@ -278,7 +312,8 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
     for index in range(len(feature_vectors)):
       # Append feature vector to list
       x.append(feature_vectors[index])
-
+      if float("inf") in feature_vectors[index] or float("nan") in feature_vectors[index]:
+        print(feature_vectors)
       # Check if the label matches the current label
       if np.array_equal(labels[index], current_label):
         # Append one if yes, indicated we want it above the plane
@@ -310,12 +345,12 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
   lsh_matrix = np.transpose(lsh_matrix)
   return lsh_matrix, lsh_offset_vals
 
-def get_next_batch():
+def get_next_batch(test = False):
   suppImgs = []
   suppLabels = []
   # Get support values for each batch  
   for j in range(batchS):
-    suppImgsOne, suppLabelsOne = get_support(False)
+    suppImgsOne, suppLabelsOne = get_support(test)
     suppImgs.append(suppImgsOne)
     suppLabels.append(suppLabelsOne)
   suppImgs = np.asarray(suppImgs)
@@ -324,7 +359,7 @@ def get_next_batch():
   queryImgBatch = []
   queryLabelBatch = []
   for i in range(batchS):
-    qImg, qLabel = get_query(False)
+    qImg, qLabel = get_query(test)
     queryImgBatch.append(qImg)
     queryLabelBatch.append(qLabel)
   queryLabelBatch = np.asarray(queryLabelBatch)
@@ -385,9 +420,8 @@ with tf.Session() as session:
   step = 1
   while step < nIt:
     step = step + 1
-    print(step)
 
-    suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
+    suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch(True)
     
     # Run the session with the optimizer
     SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, 
@@ -411,7 +445,7 @@ with tf.Session() as session:
       print("------------------------")
  
     # Run an additional test set 
-    if (step%1000) == 0:
+    if (step%check) == 0:
       TotalAcc=0.0
       #run ten batches to test accuracy
       BatchToTest=10
@@ -429,36 +463,7 @@ with tf.Session() as session:
         })
         TotalAcc += ACC
       print("Accuracy on the independent test set is: "+str(TotalAcc/float(BatchToTest)) )
- 
+  
   # Save out the model once complete
   save_path = Saver.save(session, SAVE_PATH, step)
   print("Model saved in path: %s" % SAVE_PATH)
-
-  # Use the test set 
-  for k in range(0,100):
-    suppImgs = []
- 
-    # Get test support values 
-    for j in range(batchS):
-      suppImgsOne, suppLabelsOne = get_support(True)
-      suppImgs.append(suppImgsOne)
-    suppImgs = np.asarray(suppImgs)
-  
-    # Get test queries
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(True)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
-    a = session.run(accuracy, feed_dict = {s_imgs: suppImgs, 
-                                           q_img: queryImgBatch,
-                                           q_label: queryLabelBatch,
-                                           lsh_planes: random_planes,
-                                           lsh_offsets: blank_offsets
-                                          })
-    sumAcc += a
-    
-  print("Independent Test Set: "+str(float(sumAcc)/100))

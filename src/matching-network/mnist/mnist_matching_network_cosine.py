@@ -8,7 +8,7 @@ import sys
 import os
 
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+mnist = input_data.read_data_sets("../../../testing-data/MNIST_data/",
   one_hot=True)
 
 
@@ -23,6 +23,7 @@ poolS = 2
 
 # Training information
 nIt = 5000
+check = 1000
 batchS = 32
 learning_rate = 1e-4
 
@@ -31,19 +32,22 @@ classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = [0,1,2]
 numbersTest = [7,8,9]
 nClasses = len(numbers)
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 and sys.argv[2] != "-":
   nClasses = int(sys.argv[2])
   numbers = classList[:nClasses]
   numbersTest = classList[10-nClasses:]
 nClasses = len(numbers)
 nImgsSuppClass = 5
+if len(sys.argv) > 3 and sys.argv[3] != "-":
+  nImgsSuppClass = int(sys.argv[3])
 
-if len(sys.argv) > 1:
-    base = sys.argv[1] + "/cosine-"
+
+if len(sys.argv) > 1 and sys.argv[1] != "-":
+    base = sys.argv[1] + "/minst-cosine-"
 else:
-    base = "/tmp/cosine-"
+    base = "/tmp/minst-cosine-"
 
-SAVE_PATH = base + str(nClasses)
+SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
 
 # Collecting sample both for query and for testing
 def get_samples(mnistNum, nSupportImgs, testing = False):
@@ -53,7 +57,7 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
   if not testing:
     imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
   else:
-    imageNum = random.randint(0, mnist.train.images.shape[0] - 1)
+    imageNum = random.randint(0, mnist.test.images.shape[0] - 1)
   pickedImages = []
   pickedLabels = []
   while samples < nSupportImgs:
@@ -81,10 +85,7 @@ def get_samples(mnistNum, nSupportImgs, testing = False):
 def get_support(test=False):
   supportImgs = []
   
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
+  choices = numbers
   
   for support in choices:
     newSupportImgs, newSupportLabels = get_samples(support, nImgsSuppClass,
@@ -95,13 +96,12 @@ def get_support(test=False):
 
 # Get a single query value
 def get_query(test=False):
-  if test:
-    choices = numbersTest
-  else:
-    choices = numbers
+
+  choices = numbers
+
   imageInd = random.randint(0, len(choices) - 1)
   imageNum = choices[imageInd]
-  img, label = get_samples(imageNum, 1)
+  img, label = get_samples(imageNum, 1, test)
   l=np.zeros(len(choices))
   l[imageInd]=1		
   return img[0], l
@@ -202,6 +202,26 @@ with tf.name_scope("accuracy"):
   # Find on average, how many were correct
   accuracy = tf.reduce_mean(tf.cast(total, tf.float32))
 
+def get_next_batch(test = False):
+  suppImgs = []
+  suppLabels = []
+  # Get support values for each batch  
+  for j in range(batchS):
+    suppImgsOne = get_support(test)
+    suppImgs.append(suppImgsOne)
+  suppImgs = np.asarray(suppImgs)
+  # Get query value for each batch
+  queryImgBatch = []
+  queryLabelBatch = []
+  for i in range(batchS):
+    qImg, qLabel = get_query(test)
+    queryImgBatch.append(qImg)
+    queryLabelBatch.append(qLabel)
+  queryLabelBatch = np.asarray(queryLabelBatch)
+  queryImgBatch = np.asarray(queryImgBatch)
+
+  return suppImgs, suppLabels, queryImgBatch, queryLabelBatch
+
 # Session
 
 # Initialize the variables we start with
@@ -209,39 +229,23 @@ init = tf.global_variables_initializer()
 
 with tf.Session() as session:
   session.run(init)
-
-  # Create a save location
-  Saver = tf.train.Saver()  
   
+  # Create a save location
+  Saver = tf.train.Saver()
+
   step = 1
   while step < nIt:
     step = step + 1
-  
-    suppImgs = []
 
-    # Get support values for each batch  
-    for j in range(batchS):
-      suppImgsOne = get_support(False)
-      suppImgs.append(suppImgsOne)
-    suppImgs = np.asarray(suppImgs)
-
-    # Get query value for each batch
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(False)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
-
+    suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
+    
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict =
-      {s_imgs: suppImgs, 
-       q_img: queryImgBatch,
-       q_label: queryLabelBatch
-      })
-
+    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+      ={s_imgs: suppImgs, 
+        q_img: queryImgBatch,
+        q_label: queryLabelBatch,
+       })
+    
     # Observe Values
     if (step%100) == 0:
       print("ITER: "+str(step))
@@ -249,71 +253,38 @@ with tf.Session() as session:
       print("LOSS: "+str(LOSS))
       print("------------------------")
  
-    # Run an additional test set
-    if (step%1000) == 0:
+    # Run an additional test set 
+    if (step % check) == 0:
       TotalAcc=0.0
       #run ten batches to test accuracy
       BatchToTest=10
       for repeat in range(BatchToTest):
-	      suppImgs = []
 
-        # Get supports	  
-	      for j in range(batchS):
-	      	suppImgsOne = get_support(False)
-	      	suppImgs.append(suppImgsOne)
-	      suppImgs = np.asarray(suppImgs)
-
-        # Get queries
-	      queryImgBatch = []
-	      queryLabelBatch = []
-	      for i in range(batchS):
-	      	qImg, qLabel = get_query(False)
-	      	queryImgBatch.append(qImg)
-	      	queryLabelBatch.append(qLabel)
-	      queryLabelBatch = np.asarray(queryLabelBatch)
-	      queryImgBatch = np.asarray(queryImgBatch)
-
+        suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch(True)
+          
         # Run session for test values
-	      ACC, LOSS = session.run([accuracy, loss], feed_dict = 
-          {s_imgs: suppImgs, 
-		       q_img: queryImgBatch,
-		       q_label: queryLabelBatch
-		      })
-
-	      TotalAcc+=ACC
-        
-      print("Accuracy on the independent test set is: "+
-        str(TotalAcc/float(BatchToTest)))
-
+        ACC, LOSS = session.run([accuracy, loss], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+        })
+        TotalAcc += ACC
+      print("Accuracy on the independent test set is: "+str(TotalAcc/float(BatchToTest)) )
+ 
   # Save out the model once complete
   save_path = Saver.save(session, SAVE_PATH, step)
   print("Model saved in path: %s" % SAVE_PATH)
   
   # Use the test set
-  sumAcc = 0.0
+  '''sumAcc = 0.0
   for k in range(0,100):
-    suppImgs = []
-  
     # Get test support values 
-    for j in range(batchS):
-      suppImgsOne = get_support(True)
-      suppImgs.append(suppImgsOne)
-    suppImgs = np.asarray(suppImgs)
-  
-    # Get test queries
-    queryImgBatch = []
-    queryLabelBatch = []
-    for i in range(batchS):
-      qImg, qLabel = get_query(True)
-      queryImgBatch.append(qImg)
-      queryLabelBatch.append(qLabel)
-      
-    queryLabelBatch = np.asarray(queryLabelBatch)
-    queryImgBatch = np.asarray(queryImgBatch)
+    suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch(True)
+
     a = session.run(accuracy, feed_dict = {s_imgs: suppImgs, 
                                            q_img: queryImgBatch,
                                            q_label: queryLabelBatch
                                            })
     sumAcc += a
     
-  print("Independent Test Set: "+str(float(sumAcc)/100))
+  print("Independent Test Set: "+str(float(sumAcc)/100))'''
