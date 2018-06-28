@@ -2,11 +2,12 @@
 
 import tensorflow as tf
 import numpy as np
+import getopt
+import pickle
 import random
 import math
 import sys
 import os
-import pickle
 
 train_file_path = "../../../testing-data/cifar/data_batch_"
 train_images_raw = np.empty((0, 3072))
@@ -42,20 +43,40 @@ nClasses = 5
 nSuppImgs = 5
 nSupportTraining = 10000
 nTrials = 1000
+
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:u", ["help", 
+  "num_classes=", "num_supports=", "num_iterations=","num_planes=",
+  "unseen"])
+
+classList = [1,2,3,4,5,6,7,8,9,0]
+numbers = []
+unseen = False
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nTrials = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  elif o in ("-u", "--unseen"):
+    unseen = True
+  else:
+    print("unhandled option")
+    help_message()
+
+SAVE_PATH = args[0]
+
 nSupp = nClasses * nSuppImgs
 
-numbers = [1,2]
-excluded_numbers = [6,7,8,9,0]
-while len(numbers) < nClasses:
-  selected_class = random.randint(0, 9)
-  while selected_class in numbers or selected_class in excluded_numbers:
-    selected_class = random.randint(0, 9)
-  numbers.append(selected_class)
-
-if len(sys.argv) < 2:
-  print("no model provided")
-  exit()
-SAVE_PATH = sys.argv[1]
+if unseen:
+  numbers = classList[10-nClasses:]
+else:
+  numbers = classList[:nClasses]
 
 train_images = []
 train_labels = []

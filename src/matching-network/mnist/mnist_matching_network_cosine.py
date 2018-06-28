@@ -37,7 +37,7 @@ numbersTest = []
 nClasses = 3
 nImgsSuppClass = 5
 
-base = "/tmp/minst-cosine-"
+base = "/tmp/mnist-cosine-"
 
 opts, args = getopt.getopt(sys.argv[1:], "hc:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "base_path=", "num_iterations="])
@@ -48,7 +48,7 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "minst-cosine-"
+    base = a + "mnist-cosine-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
   elif o in ("-h", "--help"):

@@ -1,12 +1,14 @@
 # Checking viability of LSH with random planes CIFAR-100
 
 import tensorflow as tf
+import getopt
 import numpy as np
 import random
 import math
 import sys
 import os
 import pickle
+
 import cifar_100
 
 cifar_100.get_data()
@@ -37,32 +39,50 @@ poolS = 2
 batchS = 32
 nPlanes = 100
 
-nClasses = 5
+nClasses = 3
 nSuppImgs = 5
 nSupportTraining = 10000
 nTrials = 1000
 nSupp = nClasses * nSuppImgs
-excluded_numbers = []
+unseen = False
 
-numbers = []
-while len(numbers) < nClasses:
-  selected_class = random.randint(0, 99)
-  while selected_class in numbers or selected_class in excluded_numbers:
-    selected_class = random.randint(0, 99)
-  numbers.append(selected_class)
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:u", ["help", 
+  "num_classes=", "num_supports=", "num_iterations=","num_planes=",
+  "unseen"])
 
-if len(sys.argv) < 2:
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nTrials = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  elif o in ("-u", "--unseen"):
+    unseen = True
+  else:
+    print("unhandled option")
+    help_message()
+
+if len(args) < 1:
   print("no model provided")
-  exit()
-SAVE_PATH = sys.argv[1]
+  exit(1)
+SAVE_PATH = args[0]
+
+nSupp = nClasses * nSuppImgs
 
 train_images = []
 train_labels = []
 list_range = np.arange(len(train_images_raw))
 np.random.shuffle(list_range)
 for index, i in enumerate(list_range):
-  train_images.append(train_images_raw[i])
-  train_labels.append(train_labels_raw[i])
+  if ((train_labels_raw[i] < 80 and not unseen) or (train_labels_raw[i]
+    > 79 and unseen)):
+    train_images.append(train_images_raw[i])
+    train_labels.append(train_labels_raw[i])
 
 train_images = np.reshape(train_images, [len(train_images), 3, 32, 32])
 train_images = np.transpose(train_images, [0, 2, 3, 1])
@@ -192,17 +212,22 @@ lsh_acc2 = 0
 # choose random support vectors
 supp = []
 supp_labels = []
-for j in numbers:
+images = []
+while len(images) < nClasses:
+  choice = random.choice(train_labels)
+  while choice in images:
+    choice = random.choice(train_labels)
   n = 0
   while n < nSuppImgs:
     supp_index = random.randint(0, train_images.shape[0] - 1)
-    while int(train_labels[supp_index]) != j:
+    while int(train_labels[supp_index]) != choice:
       supp_index += 1
       if supp_index == len(train_images):
         supp_index = 0
     n += 1
     supp.append(featureVectors[supp_index])
     supp_labels.append(int(train_labels[supp_index]))
+  images.append(choice)
 
 lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
   supp, supp_labels)
@@ -210,7 +235,7 @@ lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes,
 for i in range(nTrials):
   
   # choose random query
-  query_value = random.choice(numbers)
+  query_value = random.choice(images)
   query_index = random.randint(0, test_images.shape[0] - 1)
   while query_value != int(queryLabels[query_index]):
     query_index += 1

@@ -2,13 +2,14 @@
 
 import tensorflow as tf
 import numpy as np
+import getopt
 import random
 import math
 import sys
 import os
 
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets("../../testing-data/MNIST_data/",
+mnist = input_data.read_data_sets("../../../testing-data/MNIST_data/",
   one_hot=True)
 
 # Hardware Specifications
@@ -18,31 +19,51 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # Graph Constants
 size = [28, 28, 1]
 nKernels = [8, 16, 32]
-fully_connected_nodes = 128
 poolS = 2
 
 # LSH Testing
 batchS = 32
 nPlanes = 500 
 
-nClasses = 10
-nSuppImgs = 20 
+nClasses = 3
+nSuppImgs = 5
 nSupportTraining = 10000
 nTrials = 1000
+
+unseen = False
+
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:u", ["help", 
+  "num_classes=", "num_supports=", "num_iterations=","num_planes=",
+  "unssen"])
+
+classList = [1,2,3,4,5,6,7,8,9,0]
+numbers = []
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nTrials = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  elif o in ("-u", "--unseen"):
+    unseen = True
+  else:
+    print("unhandled option")
+    help_message()
+
+SAVE_PATH = args[0]
+
 nSupp = nClasses * nSuppImgs
 
-numbers = [8, 9, 0]
-excluded_numbers = []
-while len(numbers) < nClasses:
-  selected_class = random.randint(0, 9)
-  while selected_class in numbers or selected_class in excluded_numbers:
-    selected_class = random.randint(0, 9)
-  numbers.append(selected_class)
-
-if len(sys.argv) < 2:
-  print("no model provided")
-  exit()
-SAVE_PATH = sys.argv[1]
+if unseen:
+  numbers = classList[10-nClasses:]
+else:
+  numbers = classList[:nClasses]
 
 tf.reset_default_graph()
 

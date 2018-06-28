@@ -1,15 +1,15 @@
 # Checking viability of LSH with One versus All planes
 
+from skimage import transform, io
+from sklearn import svm
 import tensorflow as tf
 import numpy as np
-from scipy import misc
-from skimage import transform, io
+import scipy.misc
+import getopt
 import random
 import math
 import sys
 import os
-import scipy.misc
-from sklearn import svm
 
 train_file_path = "../../../testing-data/omniglot/"
 
@@ -72,18 +72,37 @@ train_images, train_labels, test_images, test_labels = get_images()
 batchS = 32
 nPlanes = 3500
 
-nClasses = 5
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  nClasses = int(sys.argv[2])
+nClasses = 3
 nSuppImgs = 5
 nSupportTraining = 10000
 nTrials = 1000
-nSupp = nClasses * nSuppImgs
+unseen = False
 
-if len(sys.argv) < 2:
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:u", ["help", 
+  "num_classes=", "num_supports=", "num_iterations=",
+  "unseen"])
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nTrials = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  elif o in ("-u", "--unseen"):
+    unseen = True
+  else:
+    print("unhandled option")
+    help_message()
+
+if len(args) < 1:
   print("no model provided")
-  exit()
-SAVE_PATH = sys.argv[1]
+  exit(1)
+SAVE_PATH = args[0]
+
+nSupp = nClasses * nSuppImgs
 
 tf.reset_default_graph()
 
@@ -245,26 +264,34 @@ cos_acc = 0
 lsh_acc = 0
 lsh_acc2 = 0
 
+# choose random support vectors
+if unseen:
+  sourceVectors = queryFeatureVectors
+  sourceLabels = queryLabels
+else:
+  sourceVectors = featureVectors
+  sourceLabels = rawLabels
+
 supp = []
 supp_labels = []
-while len(supp)/nSuppImgs < nClasses:
-  supp_index = random.randint(0, len(queryLabels) - 1)
-  choice = test_labels[supp_index]
+while len(supp) < nClasses * nSuppImgs:
+  supp_index = random.randint(0, len(sourceLabels) - 1)
+  choice = sourceLabels[supp_index]
   while choice in supp_labels:
-    supp_index = random.randint(0, len(queryLabels) - 1)
-    choice = test_labels[supp_index]
+    supp_index = random.randint(0, len(sourceLabels) - 1)
+    choice = sourceLabels[supp_index]
   n = 0
   change = 1
-  count = 0
   while n < nSuppImgs:
-    while queryLabels[supp_index] != choice:
+    count = 0
+    while sourceLabels[supp_index] != choice:
       supp_index -= count
       supp_index -= 1
       change = -1
     n += 1
     count += 1
-    supp.append(featureVectors[supp_index])
-    supp_labels.append(test_labels[supp_index])
+    supp.append(sourceVectors[supp_index])
+    supp_labels.append(sourceLabels[supp_index])
     supp_index += change
 
 lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
@@ -273,13 +300,13 @@ lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes,
 for i in range(nTrials):
   # choose random query
   query_value = random.choice(supp_labels)
-  query_index = random.randint(0, len(test_images) - 1)
-  while query_value != queryLabels[query_index]:
+  query_index = random.randint(0, len(sourceVectors) - 1)
+  while query_value != sourceLabels[query_index]:
     query_index += 1
     if query_index == len(test_images):
       query_index = 0
-  query = queryFeatureVectors[query_index]
-  query_label = queryLabels[query_index]
+  query = sourceVectors[query_index]
+  query_label = sourceLabels[query_index]
 
   # get lsh binaries (from application to matrix) for supp and query
   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
