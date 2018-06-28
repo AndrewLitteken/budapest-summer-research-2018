@@ -1,15 +1,14 @@
 # Using One versus All LSH training in a matching network OMNIGLOT
 
+from skimage import transform, io
+from sklearn import svm
 import tensorflow as tf
 import numpy as np
-from scipy import misc
-from skimage import transform, io
+import scipy.misc
 import random
 import math
 import sys 
 import os
-import scipy.misc
-from sklearn import svm
 
 train_file_path = "../../../testing-data/omniglot/"
 
@@ -44,29 +43,38 @@ poolS = 2
 
 #Training information
 nIt = 5000
-if len(sys.argv) > 5 and sys.argv[5] != "-":
-  nIt = int(sys.argv[5])
 check = 1000
 batchS = 32
 nRandPlanes = 100
 learning_rate = 1e-5
-
 period = 1000
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  period = int(sys.argv[4])
 
 # Support and testing infromation
-nClasses = 5 
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  nClasses = int(sys.argv[2])
+nClasses = 3
 nImgsSuppClass = 5 
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nImgsSuppClass = int(sys.argv[3])
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/omniglot-lsh-one-all-"
-else:
-    base = "/tmp/omniglot-lsh-one-all-"
+base = "/tmp/omniglot-lsh-one-all-"
+
+opts, args = getopt.getopt(sys.argv[1:], "hc:p:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "period_length=", "base_path=", 
+  "num_iterations="])
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "omniglot-lsh-one-rest-"
+  elif o in ("-p", "--period_length"):
+    period = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option: "+o)
+    help_message()
 
 SAVE_PATH = base + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 

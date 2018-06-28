@@ -1,13 +1,14 @@
 # Using One versus All LSH training in a matching network CIFAR
 
+from sklearn import svm
 import tensorflow as tf
 import numpy as np
+import getopt
 import pickle
 import random
 import math
 import sys
 import os
-from sklearn import svm
 
 
 train_file_path = "../../../testing-data/cifar/data_batch_"
@@ -45,27 +46,38 @@ learning_rate = 1e-8
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]
-numbers = [1,2,3]
-numbersTest = [8,9,0]
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nClasses = int(sys.argv[3])
-  numbers = classList[:nClasses]
-  numbersTest = classList[10-nClasses:]
-nClasses = len(numbers)
+numbers = []
+numbersTest = []
+nClasses = 3
 nImgsSuppClass = 5
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nImgsSuppClass = int(sys.argv[4])
 # Plane Training information
-nPickedPlanes = len(numbers)
 period = 1000
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  period = int(sys.argv[2])
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/cifar-lsh-one-rest-"
-else:
-    base = "/tmp/cifar-lsh-one-rest-"
+base = "/tmp/cifar-lsh-one-rest-"
 
+opts, args = getopt.getopt(sys.argv[1:], "hc:p:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "period_length=", "base_path=", 
+  "num_iterations="])
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "cifar-lsh-one-rest"
+  elif o in ("-p", "--period_length"):
+    period = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option")
+    help_message()
+
+numbers = classList[:nClasses]
+numbersTest = classList[10-nClasses:]
 SAVE_PATH = base + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
 train_images = []

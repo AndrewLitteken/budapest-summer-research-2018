@@ -1,14 +1,13 @@
 # Using Cosine Distance to train a matching network omniglot
 
+from skimage import transform, io
 import tensorflow as tf
 import numpy as np
-from scipy import misc
-from skimage import transform, io
+import scipy.misc
 import random
 import math
 import sys
 import os
-import scipy.misc
 
 train_file_path = "../../../testing-data/omniglot/"
 
@@ -42,25 +41,34 @@ fully_connected_nodes = 128
 poolS = 2
 
 # Training information
-nIt = 3000
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nIt = int(sys.argv[4])
+nIt = 5000
 check = 50
 batchS = 32
 learning_rate = 1e-4
 
 # Support and testing infromation
-nClasses = 5
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  nClasses = int(sys.argv[2])
+nClasses = 3
 nImgsSuppClass = 5
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nImgsSuppClass = int(sys.argv[3])
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/omniglot-cosine-"
-else:
-    base = "/tmp/omniglot-cosine-"
+base = "/tmp/omniglot-cosine-"
+
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "base_path=", "num_iterations="])
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "omniglot-cosine-"
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option: "+o)
+    help_message()
 
 SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
 

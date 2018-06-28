@@ -2,11 +2,13 @@
 
 import tensorflow as tf
 import numpy as np
+import getopt
 import pickle
 import random
 import math
 import sys
 import os
+
 import cifar_100
 
 cifar_100.get_data()
@@ -35,9 +37,6 @@ poolS = 2
 
 # Training Infomration
 nIt = 5000
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nIt = int(sys.argv[4])
-
 check = 1000
 batchS = 32
 nRandPlanes = 100
@@ -45,17 +44,28 @@ learning_rate = 1e-6
 
 # Support and testing information
 nClasses = 3
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  nClasses = int(sys.argv[2])
 
 nImgsSuppClass = 5
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nImgsSuppClass = int(sys.argv[3])
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/cifar-100-cosine-"
-else:
-    base = "/tmp/cifar-100-cosine-"
+base = "/tmp/cifar-100-cosine-"
+
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "base_path=", "num_iterations="])
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "cifar-100-cosine-"
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option")
+    help_message()
 
 SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
 

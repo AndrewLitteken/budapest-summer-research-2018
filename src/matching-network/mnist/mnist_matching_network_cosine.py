@@ -2,6 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
+import getopt
 import random
 import math
 import sys
@@ -11,6 +12,8 @@ from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("../../../testing-data/MNIST_data/",
   one_hot=True)
 
+def help_message():
+  exit(1)
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
@@ -23,31 +26,39 @@ poolS = 2
 
 # Training information
 nIt = 5000
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nIt = int(sys.argv[4])
 check = 1000
 batchS = 32
 learning_rate = 1e-4
 
 # Support and testing infromation
 classList = [1,2,3,4,5,6,7,8,9,0]
-numbers = [0,1,2]
-numbersTest = [7,8,9]
-nClasses = len(numbers)
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  nClasses = int(sys.argv[2])
-  numbers = classList[:nClasses]
-  numbersTest = classList[10-nClasses:]
-nClasses = len(numbers)
+numbers = []
+numbersTest = []
+nClasses = 3
 nImgsSuppClass = 5
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nImgsSuppClass = int(sys.argv[3])
 
+base = "/tmp/minst-cosine-"
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/minst-cosine-"
-else:
-    base = "/tmp/minst-cosine-"
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "base_path=", "num_iterations="])
+
+for o, a in opts:
+  if o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "minst-cosine-"
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option")
+    help_message()
+
+numbers = classList[:nClasses]
+numbersTest = classList[10-nClasses:]
 
 SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
 

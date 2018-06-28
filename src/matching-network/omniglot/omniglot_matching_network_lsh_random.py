@@ -43,33 +43,41 @@ poolS = 2
 
 #Training information
 nIt = 5000
-if len(sys.argv) > 6 and sys.argv[6] != "-":
-  nIt = int(sys.argv[6])
 check = 1000
 batchS = 32
 nPlanes = 100
-if len(sys.argv) > 5 and sys.argv[5] != "-":
-  nPlanes = int(sys.argv[5])
-
 learning_rate = 1e-5
 
 training = False
-if len(sys.argv) > 2:
-  if sys.argv[2] == "True":
-    training = True
 
 # Support and testing infromation
-nClasses = 5 
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nClasses = int(sys.argv[3])
+nClasses = 3
 nImgsSuppClass = 5 
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nImgsSuppClass = int(sys.argv[4])
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/omniglot-lsh-random-"
-else:
-    base = "/tmp/omniglot-lsh-random-"
+base = "/tmp/omniglot-lsh-random-"
+
+opts, args = getopt.getopt(sys.argv[1:], "htc:p:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "num_planes=", "base_path=", 
+  "num_iterations=", "training"])
+
+for o, a in opts:
+  if o in ("-t", "--training"):
+    training = True
+  elif o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "omniglot-lsh-random-"
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option: "+o)
+    help_message()
 
 SAVE_PATH = base + str(training) + "-" + str(nPlanes) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 

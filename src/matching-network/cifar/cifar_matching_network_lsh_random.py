@@ -2,6 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
+import getopt
 import pickle
 import random
 import math
@@ -43,31 +44,41 @@ learning_rate = 1e-9
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]
-numbers = [1,2,3]
-numbersTest = [8,9,0]
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nClasses = int(sys.argv[3])
-  numbers = classList[:nClasses]
-  numbersTest = classList[10-nClasses:]
-nClasses = len(numbers)
+numbers = []
+numbersTest = []
+nClasses = 3
 
 nImgsSuppClass = 5
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nImgsSuppClass = int(sys.argv[4])
 
 training = False
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  if sys.argv[2] == "True":
+
+base = "/tmp/cifar-lsh-random-"
+
+opts, args = getopt.getopt(sys.argv[1:], "htc:p:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "num_planes=", "base_path=", 
+  "num_iterations=", "training"])
+
+for o, a in opts:
+  if o in ("-t", "--training"):
     training = True
+  elif o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "cifar-lsh-random-"
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option")
+    help_message()
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/cifar-lsh-random-"
-else:
-    base = "/tmp/cifar-lsh-random-"
-
-SAVE_PATH = base + str(nClasses)
-if len(sys.argv) > 5 and sys.argv[5] != "-":
-  nPlanes = int(sys.argv[5])
+numbers = classList[:nClasses]
+numbersTest = classList[10-nClasses:]
 
 SAVE_PATH= base + str(nPlanes) + "-" + str(training)+ "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 

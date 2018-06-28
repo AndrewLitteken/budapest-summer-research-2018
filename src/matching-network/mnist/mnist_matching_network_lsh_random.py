@@ -2,6 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
+import getopt
 import random
 import math
 import sys
@@ -16,6 +17,9 @@ mnist = input_data.read_data_sets("../../../testing-data/MNIST_data/",
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
+def help_message():
+  exit(1)
+
 # Graph Constants
 size = [28, 28, 1]
 nKernels = [8, 16, 32]
@@ -24,8 +28,6 @@ poolS = 2
 
 #Training information
 nIt = 5000
-if len(sys.argv) > 6 and sys.argv[6] != "-":
-  nIt = int(sys.argv[6])
 
 check = 1000
 batchS = 32
@@ -34,30 +36,42 @@ learning_rate = 1e-5
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]
-numbers = [1,2,3]
-numbersTest = [8,9,0]
-if len(sys.argv) > 3 and sys.argv[3] != "-":
-  nClasses = int(sys.argv[3])
-  numbers = classList[:nClasses]
-  numbersTest = classList[10-nClasses:]
-nClasses = len(numbers)
+numbers = []
+numbersTest = []
+
+nClasses = 3
 nImgsSuppClass = 5
-if len(sys.argv) > 4 and sys.argv[4] != "-":
-  nImgsSuppClass = int(sys.argv[4])
+nPlanes = 100
 
 training = False
-if len(sys.argv) > 2 and sys.argv[2] != "-":
-  if sys.argv[2] == "True":
+
+base = "/tmp/minst-lsh-random-"
+
+opts, args = getopt.getopt(sys.argv[1:], "htc:p:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "num_planes=", "base_path=", 
+  "num_iterations=", "training"])
+
+for o, a in opts:
+  if o in ("-t", "--training"):
     training = True
+  elif o in ("-c", "--num_classes"):
+    nClasses = int(a)
+  elif o in ("-s", "--num_supports"):
+    nImgsSuppClass = int(a)
+  elif o in ("-b", "--base_path"):
+    base = a + "minst-lsh-random-"
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
+  elif o in ("-i", "--num_iterations"):
+    nIt = int(a)
+  elif o in ("-h", "--help"):
+    help_message()
+  else:
+    print("unhandled option: "+o)
+    help_message()
 
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    base = sys.argv[1] + "/mnist-lsh-random-"
-else:
-    base = "/tmp/minst-lsh-random-"
-
-SAVE_PATH = base + str(nClasses)
-if len(sys.argv) > 5 and sys.argv[5] != "-":
-  nPlanes = int(sys.argv[5])
+numbers = classList[:nClasses]
+numbersTest = classList[10-nClasses:]
 
 SAVE_PATH = base + str(nPlanes) + "-" + str(nClasses) + "-" + str(nImgsSuppClass) + "-" + str(training)
 
