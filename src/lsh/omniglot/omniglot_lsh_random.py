@@ -261,10 +261,10 @@ lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes,
 for i in range(nTrials):
   # choose random query
   query_value = random.choice(supp_labels)
-  query_index = random.randint(0, len(sourceVectors) - 1)
+  query_index = random.randint(0, len(sourceLabels) - 1)
   while query_value != sourceLabels[query_index]:
     query_index += 1
-    if query_index == len(test_images):
+    if query_index == len(sourceLabels):
       query_index = 0
   query = sourceVectors[query_index]
   query_label = sourceLabels[query_index]

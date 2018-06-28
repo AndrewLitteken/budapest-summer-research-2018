@@ -171,10 +171,8 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
         y.append(0)
         
     # Decrease C if the data turns out (very) noisy
-    print("attempting to fit data")
     clf = svm.SVC(kernel='linear', C = 1.0)
     clf.fit(x,y)
-    print("data fit")
       
     lsh_matrix.append(clf.coef_[0])
     
@@ -294,16 +292,15 @@ while len(supp) < nClasses * nSuppImgs:
     supp_labels.append(sourceLabels[supp_index])
     supp_index += change
 
-lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
-  supp, supp_labels)
+lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
 
 for i in range(nTrials):
   # choose random query
   query_value = random.choice(supp_labels)
-  query_index = random.randint(0, len(sourceVectors) - 1)
+  query_index = random.randint(0, len(sourceLabels) - 1)
   while query_value != sourceLabels[query_index]:
     query_index += 1
-    if query_index == len(test_images):
+    if query_index == len(sourceLabels):
       query_index = 0
   query = sourceVectors[query_index]
   query_label = sourceLabels[query_index]
