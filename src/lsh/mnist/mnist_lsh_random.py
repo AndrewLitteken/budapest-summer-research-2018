@@ -61,7 +61,7 @@ SAVE_PATH = args[0]
 nSupp = nClasses * nSuppImgs
 
 if unseen:
-  numbers = classList[10-nClasses:]
+  numbers = classList[len(classList)-nClasses:]
 else:
   numbers = classList[:nClasses]
 
@@ -204,9 +204,13 @@ for j in numbers:
 for i in range(nTrials):
   # choose random query
   query_index = random.randint(0, mnist.test.images.shape[0] - 1)
+  while np.argmax(queryLabels[query_index]) not in numbers:
+    query_index += 1
+    if query_index == len(mnist.test.images):
+        query_index = 0
   query = queryFeatureVectors[query_index]
   query_label = np.argmax(queryLabels[query_index])
-  
+ 
   # get lsh binaries (from application to matrix) for supp and query
   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
   lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes,

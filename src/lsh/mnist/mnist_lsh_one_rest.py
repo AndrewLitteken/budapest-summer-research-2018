@@ -241,12 +241,14 @@ for j in numbers:
 lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
 
 for i in range(nTrials):
-  
   # choose random query
   query_index = random.randint(0, mnist.test.images.shape[0] - 1)
+  while np.argmax(queryLabels[query_index]) not in numbers:
+    query_index += 1
+    if query_index == len(mnist.test.images):
+        query_index = 0
   query = queryFeatureVectors[query_index]
   query_label = np.argmax(queryLabels[query_index])
-
   
   # get lsh binaries (from application to matrix) for supp and query
   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
