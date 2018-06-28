@@ -4,6 +4,7 @@ from skimage import transform, io
 import tensorflow as tf
 import numpy as np
 import scipy.misc
+import getopt
 import random
 import math
 import sys

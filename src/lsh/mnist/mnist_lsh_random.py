@@ -18,7 +18,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
 size = [28, 28, 1]
-nKernels = [8, 16, 32]
+nKernels = [64, 64, 64]
 poolS = 2
 
 # LSH Testing
