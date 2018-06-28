@@ -43,25 +43,41 @@ poolS = 2
 def get_images():
   train_image_list, test_image_list = make_dir_list(train_file_path)
 
-  train_images = []
-  train_labels = []
+  raw_train_images = []
+  raw_train_labels = []
   for char_dir in train_image_list:
     for file_name in os.listdir(char_dir):
       file_name = char_dir + "/" + file_name
       picked_image = io.imread(file_name)
       image_resize = transform.resize(picked_image, size)
-      train_images.append(image_resize)
-      train_labels.append(char_dir)
+      raw_train_images.append(image_resize)
+      raw_train_labels.append(char_dir)
 
-  test_images = []
-  test_labels = []
+  train_images = []
+  train_labels = []
+  list_range = np.arange(len(raw_train_images))
+  np.random.shuffle(list_range)
+  for i in list_range:
+    train_images.append(raw_train_images[i])
+    train_labels.append(raw_train_labels[i])
+
+  raw_test_images = []
+  raw_test_labels = []
   for char_dir in test_image_list:
     for file_name in os.listdir(char_dir):
       file_name = char_dir + "/" + file_name
       picked_image = io.imread(file_name)
       image_resize = transform.resize(picked_image, size)
-      test_images.append(image_resize)
-      test_labels.append(char_dir)
+      raw_test_images.append(image_resize)
+      raw_test_labels.append(char_dir)
+  
+  test_images = []
+  test_labels = []
+  list_range = np.arange(len(raw_test_images))
+  np.random.shuffle(list_range)
+  for i in list_range:
+    test_images.append(raw_test_images[i])
+    test_labels.append(raw_test_labels[i])
 
   return train_images, train_labels, test_images, test_labels
 
@@ -235,6 +251,7 @@ else:
 
 supp = []
 supp_labels = []
+supp_indices = []
 while len(supp) < nClasses * nSuppImgs:
   supp_index = random.randint(0, len(sourceLabels) - 1)
   choice = sourceLabels[supp_index]
@@ -244,16 +261,14 @@ while len(supp) < nClasses * nSuppImgs:
   n = 0
   change = 1
   while n < nSuppImgs:
-    count = 0
     while sourceLabels[supp_index] != choice:
-      supp_index -= count
-      supp_index -= 1
-      change = -1
+      supp_index += 1
+      if supp_index == len(sourceLabels):
+        supp_index = 0
     n += 1
-    count += 1
     supp.append(sourceVectors[supp_index])
     supp_labels.append(sourceLabels[supp_index])
-    supp_index += change
+    supp_indices.append(supp_index)
 
 lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
   supp, supp_labels)
@@ -262,13 +277,12 @@ for i in range(nTrials):
   # choose random query
   query_value = random.choice(supp_labels)
   query_index = random.randint(0, len(sourceLabels) - 1)
-  while query_value != sourceLabels[query_index]:
+  while query_value != sourceLabels[query_index] or query_index in supp_indices:
     query_index += 1
     if query_index == len(sourceLabels):
       query_index = 0
   query = sourceVectors[query_index]
   query_label = sourceLabels[query_index]
-  
   # get lsh binaries (from application to matrix) for supp and query
   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
   lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes,
