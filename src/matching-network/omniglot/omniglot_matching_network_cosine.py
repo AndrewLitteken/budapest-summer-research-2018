@@ -43,7 +43,7 @@ poolS = 2
 
 # Training information
 nIt = 5000
-check = 50
+check = 1000
 batchS = 32
 learning_rate = 1e-4
 

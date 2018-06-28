@@ -1,14 +1,14 @@
 # Using Random LSH Planes training in a matching network OMNIGLOT
 
+from skimage import transform, io
 import tensorflow as tf
 import numpy as np
-from scipy import misc
-from skimage import transform, io
+import scipy.misc
+import getopt
 import random
 import math
 import sys 
 import os
-import scipy.misc
 
 train_file_path = "../../../testing-data/omniglot/"
 
@@ -110,10 +110,7 @@ def get_samples(data_dir, nSupportImgs):
 def get_support(test=False):
   supportImgs = []
 
-  if test:
-    choices = test_images
-  else:
-    choices = train_images
+  choices = train_images
 
   characters = []
   while len(characters) < nClasses:
