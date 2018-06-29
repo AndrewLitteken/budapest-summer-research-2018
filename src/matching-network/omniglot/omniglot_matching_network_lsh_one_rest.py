@@ -37,7 +37,7 @@ train_images, test_images = make_dir_list(train_file_path)
 
 # Graph Constants
 size = [28, 28, 1]
-nKernels = [8, 16, 32]
+nKernels = [64, 64, 64]
 fully_connected_nodes = 128
 poolS = 2
 
