@@ -5,3 +5,5 @@
 *testing-data/cifar-100
 *__pycache__
 *.pyc
+*.script
+*.o*
