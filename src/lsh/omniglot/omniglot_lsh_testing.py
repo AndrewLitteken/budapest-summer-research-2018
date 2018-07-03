@@ -1,6 +1,7 @@
 # Checking viability of LSH with random planes Omniglot
 
 from skimage import transform, io
+from sklearn import svm
 import tensorflow as tf
 import numpy as np
 import scipy.misc
@@ -82,7 +83,6 @@ def get_images():
   return train_images, train_labels, test_images, test_labels
 
 train_images, train_labels, test_images, test_labels = get_images()
-
 # LSH Testing
 batchS = 32
 nPlanes_list = [500] 
@@ -204,11 +204,18 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
 def gen_lsh_random_planes(num_planes, feature_vectors, labels):
   return np.transpose((np.matlib.rand(feature_vectors.shape[-1], num_planes)   - 0.5) * 2), np.zeros(num_planes)
 
+def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
+  lsh_vectors = np.matmul(feature_vectors, np.transpose(LSH_matrix))
+  lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
+  lsh_bin = np.sign(lsh_vectors)
+  lsh_bin = np.clip(lsh_bin, 0, 1)
+  return lsh_bin, lsh_vectors
+
   # Generate distance
-def lsh_dist(lshSupp, lshQueryO, lshVecSupp, lshVecQuery):
+def lsh_dist(lshSupp, lshQueryO, lshVecSupp, lshVecQuery, nPlanes):
   qlist = []
-  lshQuery = np.empty([nSupp, nClasses])
-  lshQuery2 = np.empty([nSupp, nClasses])
+  lshQuery = np.empty([nSupp, nPlanes])
+  lshQuery2 = np.empty([nSupp, nPlanes])
   for i in range(nSupp):
     lshQuery[i] = lshQueryO
     lshQuery2[i] = lshVecQuery
@@ -362,7 +369,7 @@ for category in os.listdir(model_dir):
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
                 elif method == "one_rest":
-                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
+                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
 
                 for i in range(nTrials):
                   # choose random query
