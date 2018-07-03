@@ -37,8 +37,6 @@ poolS = 2
 
 # Training Infomration
 nIt = 5000
-if len(sys.argv) > 6 and sys.argv[6] != "-":
-  nIt = int(sys.argv[6])
 check = 1000
 batchS = 32
 nPlanes = 100
@@ -53,29 +51,28 @@ training = False
 
 base = "/tmp/cifar-100-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:p:i:b:s:", ["help", 
-  "num_classes=", "num_supports=", "period_length=", "base_path=", 
-  "num_iterations="])
+opts, args = getopt.getopt(sys.argv[1:], "htc:p:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "num_planes=", "base_path=", 
+  "num_iterations=", "training"])
 
 for o, a in opts:
-  if o in ("-c", "--num_classes"):
+  if o in ("-t", "--training"):
+    training = True
+  elif o in ("-c", "--num_classes"):
     nClasses = int(a)
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "cifar-100-lsh-one-rest-"
-  elif o in ("-p", "--period_length"):
-    period = int(a)
+    base = a + "minst-lsh-random-"
+  elif o in ("-p", "--num_planes"):
+    nPlanes = int(a)
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
   elif o in ("-h", "--help"):
     help_message()
   else:
-    print("unhandled option")
+    print("unhandled option: "+o)
     help_message()
-
-SAVE_PATH = base + str(nClasses)
-nPlanes = int(sys.argv[5])
 
 SAVE_PATH= base + str(nPlanes) + "-" + str(training) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 

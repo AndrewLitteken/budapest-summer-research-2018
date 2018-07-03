@@ -5,6 +5,7 @@ from sklearn import svm
 import tensorflow as tf
 import numpy as np
 import scipy.misc
+import getopt
 import random
 import math
 import sys 

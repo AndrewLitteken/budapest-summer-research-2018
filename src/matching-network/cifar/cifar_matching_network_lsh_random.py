@@ -40,7 +40,7 @@ nIt = 5000
 check = 1000
 batchS = 32
 nPlanes = 100
-learning_rate = 1e-9
+learning_rate = 1e-10
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]

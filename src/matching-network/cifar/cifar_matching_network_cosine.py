@@ -39,7 +39,7 @@ poolS = 2
 nIt = 5000
 check = 1000
 batchS = 32
-learning_rate = 1e-4
+learning_rate = 1e-8
 
 # Support and testing infromation
 classList = [1,2,3,4,5,6,7,8,9,0]

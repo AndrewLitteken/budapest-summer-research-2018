@@ -120,6 +120,28 @@ if len(args) < 1:
   exit(1)
 SAVE_PATH = args[0]
 
+end_file = SAVE_PATH.split("/")[-1]
+
+end_file = end_file.split("-")
+
+index = 0
+reference_dict = None
+while not reference_dict:
+  if end_file[index] == "cosine":
+    reference_dict = (("classes", end_file[index + 1]),
+                      ("supports", end_file[index+2]))
+  elif end_file[index] == "lsh":
+    if end_file[index + 1] == "one":
+      reference_dict = (("classes", end_file[index + 3]),
+                        ("supports", end_file[index + 4],
+                        ("period", end_file[index + 2]),))
+    else:
+      reference_dict = (("classes", end_file[index + 3]),
+                        ("supports", end_file[index + 4]),
+                        ("period", end_file[index + 2]),
+                        ("training", end_file[index + 5]))
+  index+=1
+
 nSupp = nClasses * nSuppImgs
 
 tf.reset_default_graph()
@@ -315,10 +337,18 @@ for i in range(nTrials):
     lsh_acc+=1
 
   if LSHMatch2 == query_label:
-    lsh_acc2+=1   
+    lsh_acc2+=1
 
-print("Cos Acc: "+str(float(cos_acc)/(nTrials) * 100)+"%")
-print("LSH Acc: "+str(float(lsh_acc)/(nTrials) * 100)+"%")
-print("LSH Acc2: "+str(float(lsh_acc2)/(nTrials) * 100)+"%")
+#print("Cos Acc: "+str(float(cos_acc)/(nTrials) * 100)+"%")
+#print("LSH Acc: "+str(float(lsh_acc)/(nTrials) * 100)+"%")
+#print("LSH Acc2: "+str(float(lsh_acc2)/(nTrials) * 100)+"%")
+cos_lsh_acc = float(cos_acc)/(nTrials)
+calc_lsh_acc = float(lsh_acc)/(nTrials)
+calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
 eff = float(sumEff) / nTrials
-print("Effectiveness: "+str(eff))
+#print("Effectiveness: "+str(eff))
+output="lsh_random,"
+for i in reference_dict:
+  output += i[1] + ","
+output += str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
+print(output) 
