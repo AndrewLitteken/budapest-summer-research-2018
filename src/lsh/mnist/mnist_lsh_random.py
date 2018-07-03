@@ -34,7 +34,7 @@ unseen = False
 
 opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:u", ["help", 
   "num_classes=", "num_supports=", "num_iterations=","num_planes=",
-  "unssen"])
+  "unseen"])
 
 classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = []
