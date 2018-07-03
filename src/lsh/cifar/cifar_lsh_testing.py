@@ -39,7 +39,7 @@ poolS = 2
 
 batchS = 32
 nPlanes_list = [500] 
-
+classList = [1,2,3,4,5,6,7,8,9,0]
 nClasses_list = [3]
 nSuppImgs_list = [5]
 nSupportTraining = 10000
@@ -77,7 +77,7 @@ for o, a in opts:
 
 if not model_dir:
   print("no list of models provided")
-
+  exit(1)
 train_images = []
 train_labels = []
 list_range = np.arange(len(train_images_raw))
@@ -117,8 +117,6 @@ def create_network(img, size, First = False):
   
   return currInp
 
-features = create_network(dataset, size)
-
 # Cosine Similarity 
 def cos_similarities(supports, query): 
   dotProduct = np.sum(np.multiply(supports, query), (1))
@@ -133,7 +131,7 @@ def gen_lsh_random_planes(num_planes, feature_vectors, labels):
     # lsh_offset_vals.append(np.dot(clf.intercept_[0], clf.coef_[0]))
   return lsh_matrix, lsh_offset_vals, clfs
 
-def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
+def gen_lsh_pick_planes(num_planes, feature_vectors, labels, numbers):
   
   lsh_matrix = []
   lsh_offset_vals = []
@@ -205,7 +203,7 @@ def lsh_dist(lshSupp, lshQueryO, lshVecSupp, lshVecQuery, nPlanes):
 file_objs = {}
 for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "../../../data/csv/omniglot_"+model_style+"_lsh_"+method+".csv"
+    data_file_name = "../../../data/csv/cifar_"+model_style+"_lsh_"+method+".csv"
     file_objs[data_file_name] = open(data_file_name, 'w')
     first_line = "method,model_classes,model_supports,"
     if model_style == "one_rest":
@@ -263,6 +261,10 @@ for category in os.listdir(model_dir):
           if method == "one_rest":
             nPlanes = nClasses
           for unseen in unseen_list:
+              if unseen:
+                numbers = classList[10-nClasses:]
+              else:
+                numbers = classList[:nClasses]
               for nSuppImgs in nSuppImgs_list:
                 tf.reset_default_graph()
 
@@ -314,50 +316,35 @@ for category in os.listdir(model_dir):
                 lsh_acc = 0
                 lsh_acc2 = 0
                 # choose random support vectors
-                if unseen:
-                  sourceVectors = queryFeatureVectors
-                  sourceLabels = queryLabels
-                else:
-                  sourceVectors = featureVectors
-                  sourceLabels = rawLabels
-
                 supp = []
                 supp_labels = []
-                supp_indices = []
-                while len(supp) < nClasses * nSuppImgs:
-                  supp_index = random.randint(0, len(sourceLabels) - 1)
-                  choice = sourceLabels[supp_index]
-                  while choice in supp_labels:
-                    supp_index = random.randint(0, len(sourceLabels) - 1)
-                    choice = sourceLabels[supp_index]
+                for j in numbers:
                   n = 0
-                  change = 1
                   while n < nSuppImgs:
-                    while sourceLabels[supp_index] != choice:
+                    supp_index = random.randint(0, train_images.shape[0] - 1)
+                    while int(train_labels[supp_index]) != j:
                       supp_index += 1
-                      if supp_index == len(sourceLabels):
+                      if supp_index == len(train_images):
                         supp_index = 0
                     n += 1
-                    supp.append(sourceVectors[supp_index])
-                    supp_labels.append(sourceLabels[supp_index])
-                    supp_indices.append(supp_index)
+                    supp.append(featureVectors[supp_index])
+                    supp_labels.append(int(train_labels[supp_index]))
 
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
                 elif method == "one_rest":
-                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
+                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
 
                 for i in range(nTrials):
                   # choose random query
-                  query_value = random.choice(supp_labels)
-                  query_index = random.randint(0, len(sourceLabels) - 1)
-                  while query_value != sourceLabels[query_index] or query_index in supp_indices:
+                  query_value = random.choice(numbers)
+                  query_index = random.randint(0, test_images.shape[0] - 1)
+                  while query_value != int(queryLabels[query_index]):
                     query_index += 1
-                    if query_index == len(sourceLabels):
+                    if query_index == len(test_images):
                       query_index = 0
-                  query = sourceVectors[query_index]
-                  query_label = sourceLabels[query_index]
-                
+                  query = queryFeatureVectors[query_index]
+                  query_label = queryLabels[query_index] 
                   # get lsh binaries (from application to matrix) for supp and query
                   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
                   lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes, lsh_offset_vals)
