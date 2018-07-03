@@ -84,13 +84,13 @@ while not reference_dict:
                       ("supports", end_file[index+2]))
   elif end_file[index] == "lsh":
     if end_file[index + 1] == "one":
-      reference_dict = (("classes", end_file[index + 3]),
-                        ("supports", end_file[index + 4],
-                        ("period", end_file[index + 2]),))
+      reference_dict = (("classes", end_file[index + 4]),
+                        ("supports", end_file[index + 5],
+                        ("period", end_file[index + 3]),))
     else:
       reference_dict = (("classes", end_file[index + 3]),
                         ("supports", end_file[index + 4]),
-                        ("period", end_file[index + 2]),
+                        ("planes", end_file[index + 2]),
                         ("training", end_file[index + 5]))
   index+=1
 

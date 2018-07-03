@@ -76,7 +76,7 @@ while not reference_dict:
     else:
       reference_dict = (("classes", end_file[index + 3]),
                         ("supports", end_file[index + 4]),
-                        ("period", end_file[index + 2]),
+                        ("planes", end_file[index + 2]),
                         ("training", end_file[index + 5]))
   index+=1
 
