@@ -7,19 +7,19 @@ echo "classes,samples,training,planes,accuracy" > $curr_set'_matching_network_ls
 echo "classes,samples,accuracy" > $curr_set'_matching_network_cosine.csv' 
 for i in $(ls | grep o10 ); do
 	file=$(echo $i | cut -d "." -f 1)
-	third=$(echo $file | cut -d "_" -f 3)
+	third=$(echo $file | cut -d "_" -f 4)
 	if [ $third == "one" ]; then
 		classes=$(echo $file | cut -d "_" -f 5)		
-		samples=$(echo $file | cut -d "_" -f 6)		
-		period=$(echo $file | cut -d "_" -f 7)		
+		samples=$(echo $file | cut -d "_" -f 7)		
+		period=$(echo $file | cut -d "_" -f 8)		
 	elif [ $third == "random" ]; then
+		classes=$(echo $file | cut -d "_" -f 5)		
+		samples=$(echo $file | cut -d "_" -f 6)		
+		training=$(echo $file | cut -d "_" -f 7)
+		planes=$(echo $file | cut -d "_" -f 8)	
+	else
 		classes=$(echo $file | cut -d "_" -f 4)		
 		samples=$(echo $file | cut -d "_" -f 5)		
-		training=$(echo $file | cut -d "_" -f 6)
-		planes=$(echo $file | cut -d "_" -f 7)	
-	else
-		classes=$(echo $file | cut -d "_" -f 3)		
-		samples=$(echo $file | cut -d "_" -f 4)		
 
 	fi
 	loss=$(cat $i | tail -n 5 | grep LOSS | cut -d " " -f 2)

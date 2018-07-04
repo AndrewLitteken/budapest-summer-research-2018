@@ -293,7 +293,7 @@ for category in os.listdir(model_dir):
     Saver.restore(session, SAVE_PATH)
    
     rawDataset = seen_train_images
-    unseenRawLabels = seen_train_labels
+    seenRawLabels = seen_train_labels
 
     seenFeatureVectors = None
     for i in range(int(len(rawDataset)/1000)):
@@ -304,7 +304,7 @@ for category in os.listdir(model_dir):
         seenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
           FEAT.shape[3], FEAT.shape[4]])
       seenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-      seenFeatureVectors = np.reshape(seenFeatureVectors, (len(rawDataset), -1))  
+    seenFeatureVectors = np.reshape(seenFeatureVectors, (len(rawDataset), -1))  
 
     queryDataset = seen_test_images
     seenQueryLabels = seen_test_labels
@@ -318,7 +318,7 @@ for category in os.listdir(model_dir):
         seenQueryFeatureVectors = np.empty([len(queryDataset), 
           FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
       seenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-    seenQueryFeatureVectors = np.reshape(unseenQueryFeatureVectors, (len(queryDataset), -1))
+    seenQueryFeatureVectors = np.reshape(seenQueryFeatureVectors, (len(queryDataset), -1))
 
     rawDataset = unseen_train_images
     unseenRawLabels = unseen_train_labels
@@ -372,6 +372,7 @@ for category in os.listdir(model_dir):
               for nSuppImgs in nSuppImgs_list:
 
                 nSupp = nClasses * nSuppImgs
+                sumEff = 0
                 cos_acc = 0
                 lsh_acc = 0
                 lsh_acc2 = 0
@@ -396,7 +397,7 @@ for category in os.listdir(model_dir):
                   images.append(choice)
 
                 if method == "random":
-                  lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
+                  lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], supp_labels)
                 elif method == "one_rest":
                   lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(images, supp, supp_labels)
 
@@ -404,12 +405,12 @@ for category in os.listdir(model_dir):
                   # choose random query
                   query_value = random.choice(images)
                   query_index = random.randint(0, test_images.shape[0] - 1)
-                  while query_value != int(queryLabels[query_index]):
+                  while query_value != int(test_labels[query_index]):
                     query_index += 1
                     if query_index == len(test_images):
                       query_index = 0
                   query = queryFeatureVectors[query_index]
-                  query_label = queryLabels[query_index]
+                  query_label = test_labels[query_index]
                   # get lsh binaries (from application to matrix) for supp and query
                   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
                   lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes, lsh_offset_vals)
@@ -457,5 +458,5 @@ for category in os.listdir(model_dir):
         if method == "one_rest":
           break
 
-for file_obj in file_obs.keys():
+for file_obj in file_objs.keys():
   file_objs[file_obj].close()
