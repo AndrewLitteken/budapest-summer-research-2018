@@ -355,8 +355,6 @@ for category in os.listdir(model_dir):
                 if method == "random":
                   output+=str(nPlanes)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
-                print(output_file)
-                print(output)
                 file_objs[output_file].write(output + "\n")
         if method == "one_rest":
           break

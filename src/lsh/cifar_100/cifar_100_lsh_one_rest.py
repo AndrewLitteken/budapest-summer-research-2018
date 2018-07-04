@@ -108,10 +108,20 @@ for index, i in enumerate(list_range):
 train_images = np.reshape(train_images, [len(train_images), 3, 32, 32])
 train_images = np.transpose(train_images, [0, 2, 3, 1]) 
 
-test_images = test[b"data"]
+test_images_raw = test[b"data"]
+test_labels_raw = test[b"fine_labels"]
+list_range = np.arange(len(test_images_raw))
+np.random.shuffle(list_range)
+
+test_images = []
+test_labels = []
+for index, i in enumerate(list_range):
+  if ((test_labels_raw[i] < 80 and not unseen) or (test_labels_raw[i]
+    > 79 and unseen)):
+    test_images.append(test_images_raw[i])
+    test_labels.append(test_labels_raw[i])
 test_images = np.reshape(test_images, [len(test_images), 3, 32, 32])
 test_images = np.transpose(test_images, [0, 2, 3, 1])
-test_labels = test[b"fine_labels"]
 
 tf.reset_default_graph()
 
