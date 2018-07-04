@@ -278,72 +278,100 @@ for category in os.listdir(model_dir):
                             ("planes", end_file[index + 2]),
                             ("training", end_file[index + 5]))
       index+=1
-    
+  tf.reset_default_graph()
+
+  dataset = tf.placeholder(tf.float32, [None]+size)
+
+  features = create_network(dataset, size)
+
+  init = tf.global_variables_initializer()
+
+  with tf.Session() as session:
+    session.run(init)
+
+    Saver = tf.train.Saver()
+    Saver.restore(session, SAVE_PATH)
+   
+    rawDataset = seen_train_images
+    unseenRawLabels = seen_train_labels
+
+    seenFeatureVectors = None
+    for i in range(int(len(rawDataset)/1000)):
+      FEAT = (session.run([features], feed_dict =
+        {dataset: rawDataset[i*1000:(i+1)*1000]}))
+      FEAT = np.asarray(FEAT)
+      if seenFeatureVectors is None:
+        seenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
+          FEAT.shape[3], FEAT.shape[4]])
+      seenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+      seenFeatureVectors = np.reshape(seenFeatureVectors, (len(rawDataset), -1))  
+
+    queryDataset = seen_test_images
+    seenQueryLabels = seen_test_labels
+
+    seenQueryFeatureVectors = None
+    for i in range(int(len(queryDataset)/1000)):
+      FEAT = (session.run([features], feed_dict =
+        {dataset: queryDataset[i*1000:(i+1)*1000]}))
+      FEAT = np.asarray(FEAT)
+      if seenQueryFeatureVectors is None:
+        seenQueryFeatureVectors = np.empty([len(queryDataset), 
+          FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+      seenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+    seenQueryFeatureVectors = np.reshape(unseenQueryFeatureVectors, (len(queryDataset), -1))
+
+    rawDataset = unseen_train_images
+    unseenRawLabels = unseen_train_labels
+
+    unseenFeatureVectors = None
+    for i in range(int(len(rawDataset)/1000)):
+      FEAT = (session.run([features], feed_dict =
+        {dataset: rawDataset[i*1000:(i+1)*1000]}))
+      FEAT = np.asarray(FEAT)
+      if unseenFeatureVectors is None:
+        unseenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
+          FEAT.shape[3], FEAT.shape[4]])
+      unseenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+    unseenFeatureVectors = np.reshape(unseenFeatureVectors, (len(rawDataset), -1))  
+
+    queryDataset = unseen_test_images
+    unseenQueryLabels = unseen_test_labels
+
+    unseenQueryFeatureVectors = None
+    for i in range(int(len(queryDataset)/1000)):
+      FEAT = (session.run([features], feed_dict =
+        {dataset: queryDataset[i*1000:(i+1)*1000]}))
+      FEAT = np.asarray(FEAT)
+      if unseenQueryFeatureVectors is None:
+        unseenQueryFeatureVectors = np.empty([len(queryDataset), 
+          FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+      unseenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+    unseenQueryFeatureVectors = np.reshape(unseenQueryFeatureVectors, (len(queryDataset), -1))
+
     for method in hashing_methods:
       for nPlanes in nPlanes_list:
         for nClasses in nClasses_list:
           if method == "one_rest":
             nPlanes = nClasses
           for unseen in unseen_list:
-            if unseen:
+              if unseen:
                 train_images = unseen_train_images
                 train_labels = unseen_train_labels
+                featureVectors = unseenFeatureVectors
                 test_images = unseen_test_images
                 test_labels = unseen_test_labels
-            else:
+                queryFeatureVectors = unseenQueryFeatureVectors
+              else:
                 train_images = seen_train_images
                 train_labels = seen_train_labels
+                featureVectors = seenFeatureVectors
                 test_images = seen_test_images
                 test_labels = seen_test_labels
-              
-            for nSuppImgs in nSuppImgs_list:
-                tf.reset_default_graph()
+                queryFeatureVectors = seenQueryFeatureVectors
+
+              for nSuppImgs in nSuppImgs_list:
 
                 nSupp = nClasses * nSuppImgs
-
-                # Query Information - Vector of images
-                dataset = tf.placeholder(tf.float32, [None]+size)
-
-                features = create_network(dataset, size)
-
-                init = tf.global_variables_initializer()
-
-                with tf.Session() as session:
-                  session.run(init)
-
-                  Saver = tf.train.Saver()
-                  Saver.restore(session, SAVE_PATH)
-                 
-                  rawDataset = train_images
-                  rawLabels = train_labels
-
-                  featureVectors = None
-                  for i in range(int(len(rawDataset)/1000)):
-                    FEAT = (session.run([features], feed_dict =
-                      {dataset: rawDataset[i*1000:(i+1)*1000]}))
-                    FEAT = np.asarray(FEAT)
-                    if featureVectors is None:
-                      featureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
-                        FEAT.shape[3], FEAT.shape[4]])
-                    featureVectors[i*1000:(i+1)*1000] = FEAT[0]
-                  featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
-
-                  queryDataset = test_images
-                  queryLabels = test_labels
-
-                  queryFeatureVectors = None
-                  for i in range(int(len(queryDataset)/1000)):
-                    print(i)
-                    FEAT = (session.run([features], feed_dict =
-                      {dataset: queryDataset[i*1000:(i+1)*1000]}))
-                    FEAT = np.asarray(FEAT)
-                    if queryFeatureVectors is None:
-                      queryFeatureVectors = np.empty([len(queryDataset), 
-                        FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
-                    queryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-                  queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))
-
-                sumEff = 0
                 cos_acc = 0
                 lsh_acc = 0
                 lsh_acc2 = 0
