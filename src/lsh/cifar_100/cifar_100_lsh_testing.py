@@ -1,5 +1,6 @@
 # Checking viability of LSH with random planes CIFAR-100
 
+from sklearn import svm
 import tensorflow as tf
 import getopt
 import numpy as np
@@ -25,7 +26,7 @@ test_file_name = "../../../testing-data/cifar-100/test"
 with open(test_file_name, 'rb') as cifar_file:
   test = pickle.load(cifar_file, encoding = 'bytes')
   test_images_raw = test[b"data"]
-	test_labels_raw = test[b"fine_labels"]
+  test_labels_raw = test[b"fine_labels"]
 
 seen_train_images = []
 seen_train_labels = []
@@ -36,11 +37,11 @@ list_range = np.arange(len(train_images_raw))
 np.random.shuffle(list_range)
 for index, i in enumerate(list_range):
   if train_labels_raw[i] < 80:
-  	seen_train_images.append(train_images_raw[i])
-  	seen_train_labels.append(train_labels_raw[i])
+    seen_train_images.append(train_images_raw[i])
+    seen_train_labels.append(train_labels_raw[i])
   else:
-  	unseen_train_images.append(train_images_raw[i])
-  	unseen_train_labels.append(train_labels_raw[i])
+    unseen_train_images.append(train_images_raw[i])
+    unseen_train_labels.append(train_labels_raw[i])
 
 seen_train_images = np.reshape(seen_train_images, [len(seen_train_images), 3, 32, 32])
 seen_train_images = np.transpose(seen_train_images, [0, 2, 3, 1]) 
@@ -52,17 +53,19 @@ seen_test_images = []
 seen_test_labels = []
 unseen_test_images = []
 unseen_test_labels = []
+list_range = np.arange(len(test_images_raw))
+np.random.shuffle(list_range)
 for index, i in enumerate(list_range):
-	if test_labels_raw[i] < 80:
-  	seen_test_images.append(test_images_raw[i])
-  	seen_test_labels.append(test_labels_raw[i])
+  if test_labels_raw[i] < 80:
+    seen_test_images.append(test_images_raw[i])
+    seen_test_labels.append(test_labels_raw[i])
   else:
-  	unseen_test_images.append(test_images_raw[i])
-  	unseen_test_labels.append(test_labels_raw[i])
+    unseen_test_images.append(test_images_raw[i])
+    unseen_test_labels.append(test_labels_raw[i])
 seen_test_images = np.reshape(seen_test_images, [len(seen_test_images), 3, 32, 32])
-seen_test_images = np.transpose(seen_test_images, [0, 2, 3, 1])	
+seen_test_images = np.transpose(seen_test_images, [0, 2, 3, 1])  
 unseen_test_images = np.reshape(unseen_test_images, [len(unseen_test_images), 3, 32, 32])
-unseen_test_images = np.transpose(unseen_test_images, [0, 2, 3, 1])	
+unseen_test_images = np.transpose(unseen_test_images, [0, 2, 3, 1])  
 # Hardware Specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
@@ -152,7 +155,7 @@ def gen_lsh_random_planes(num_planes, feature_vectors, labels):
     # lsh_offset_vals.append(np.dot(clf.intercept_[0], clf.coef_[0]))
   return lsh_matrix, lsh_offset_vals, clfs
 
-def gen_lsh_pick_planes(num_planes, feature_vectors, labels, numbers):
+def gen_lsh_pick_planes(images, feature_vectors, labels):
   
   lsh_matrix = []
   lsh_offset_vals = []
@@ -160,7 +163,7 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels, numbers):
   feature_vectors = np.reshape(np.asarray(feature_vectors),
     (len(feature_vectors), -1))
 
-  for index_i, i in enumerate(numbers):
+  for index_i, i in enumerate(images):
     x = []
     y = []
     for index in range(len(feature_vectors)):
@@ -282,17 +285,18 @@ for category in os.listdir(model_dir):
           if method == "one_rest":
             nPlanes = nClasses
           for unseen in unseen_list:
-          		if unseen:
-          			train_images = unseen_train_images
-          			train_labels = unseen_train_labels
-          			test_images = unseen_test_images
-          			test_labels = unseen_test_labels
-          		else:
-          			train_images = seen_train_images
-          			train_labels = seen_train_labels
-          			test_images = seen_test_images
-          			test_labels = seen_test_labels
-              for nSuppImgs in nSuppImgs_list:
+            if unseen:
+                train_images = unseen_train_images
+                train_labels = unseen_train_labels
+                test_images = unseen_test_images
+                test_labels = unseen_test_labels
+            else:
+                train_images = seen_train_images
+                train_labels = seen_train_labels
+                test_images = seen_test_images
+                test_labels = seen_test_labels
+              
+            for nSuppImgs in nSuppImgs_list:
                 tf.reset_default_graph()
 
                 nSupp = nClasses * nSuppImgs
@@ -329,6 +333,7 @@ for category in os.listdir(model_dir):
 
                   queryFeatureVectors = None
                   for i in range(int(len(queryDataset)/1000)):
+                    print(i)
                     FEAT = (session.run([features], feed_dict =
                       {dataset: queryDataset[i*1000:(i+1)*1000]}))
                     FEAT = np.asarray(FEAT)
@@ -344,39 +349,39 @@ for category in os.listdir(model_dir):
                 lsh_acc2 = 0
                 # choose random support vectors
                 supp = []
-								supp_labels = []
-								images = []
-								while len(images) < nClasses:
-								  choice = random.choice(train_labels)
-								  while choice in images:
-								    choice = random.choice(train_labels)
-								  n = 0
-								  while n < nSuppImgs:
-								    supp_index = random.randint(0, train_images.shape[0] - 1)
-								    while int(train_labels[supp_index]) != choice:
-								      supp_index += 1
-								      if supp_index == len(train_images):
-								        supp_index = 0
-								    n += 1
-								    supp.append(featureVectors[supp_index])
-								    supp_labels.append(int(train_labels[supp_index]))
-								  images.append(choice)
+                supp_labels = []
+                images = []
+                while len(images) < nClasses:
+                  choice = random.choice(train_labels)
+                  while choice in images:
+                    choice = random.choice(train_labels)
+                  n = 0
+                  while n < nSuppImgs:
+                    supp_index = random.randint(0, train_images.shape[0] - 1)
+                    while int(train_labels[supp_index]) != choice:
+                      supp_index += 1
+                      if supp_index == len(train_images):
+                        supp_index = 0
+                    n += 1
+                    supp.append(featureVectors[supp_index])
+                    supp_labels.append(int(train_labels[supp_index]))
+                  images.append(choice)
 
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
                 elif method == "one_rest":
-                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
+                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(images, supp, supp_labels)
 
                 for i in range(nTrials):
                   # choose random query
-								  query_value = random.choice(images)
-								  query_index = random.randint(0, test_images.shape[0] - 1)
-								  while query_value != int(queryLabels[query_index]):
-								    query_index += 1
-								    if query_index == len(test_images):
-								      query_index = 0
-								  query = queryFeatureVectors[query_index]
-								  query_label = queryLabels[query_index]
+                  query_value = random.choice(images)
+                  query_index = random.randint(0, test_images.shape[0] - 1)
+                  while query_value != int(queryLabels[query_index]):
+                    query_index += 1
+                    if query_index == len(test_images):
+                      query_index = 0
+                  query = queryFeatureVectors[query_index]
+                  query_label = queryLabels[query_index]
                   # get lsh binaries (from application to matrix) for supp and query
                   lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
                   lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes, lsh_offset_vals)
@@ -425,4 +430,4 @@ for category in os.listdir(model_dir):
           break
 
 for file_obj in file_obs.keys():
-  file_objs[file_obj].close()  Th
+  file_objs[file_obj].close()
