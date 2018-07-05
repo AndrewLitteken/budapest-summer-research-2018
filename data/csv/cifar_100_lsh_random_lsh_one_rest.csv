@@ -1,0 +1,2 @@
+method,model_classes,model_supports,testing_classes,testing_supports,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
+lsh_one_rest,False,20,500,5,3,5,False,0.361,0.361,0.361

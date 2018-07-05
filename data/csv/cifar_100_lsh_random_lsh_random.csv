@@ -1,0 +1,2 @@
+method,model_classes,model_supports,testing_classes,testing_supports,testing_planes,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
+lsh_random,False,20,500,5,3,5,500,False,0.353,0.353,0.353
