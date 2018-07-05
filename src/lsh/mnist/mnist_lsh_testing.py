@@ -175,9 +175,9 @@ for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
     data_file_name = "../../../data/csv/mnist_"+model_style+"_lsh_"+method+".csv"
     file_objs[data_file_name] = open(data_file_name, 'w')
     first_line = "method,model_classes,model_supports,"
-    if model_style == "one_rest":
+    if model_style == "lsh_one_rest":
       first_line += "period,"
-    elif model_style == "random":
+    elif model_style == "lsh_random":
       first_line += "model_planes,trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":

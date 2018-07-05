@@ -1,2 +1,10 @@
 method,model_classes,model_supports,testing_classes,testing_supports,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
-lsh_one_rest,20,5,3,5,False,0.389,0.332,0.363
+lsh_one_rest,20,5,5,1,True,0.389,0.233,0.266
+lsh_one_rest,20,5,5,5,True,0.598,0.447,0.543
+lsh_one_rest,20,5,5,10,True,0.466,0.43,0.53
+lsh_one_rest,20,5,10,1,True,0.244,0.132,0.276
+lsh_one_rest,20,5,10,5,True,0.241,0.204,0.278
+lsh_one_rest,20,5,10,10,True,0.341,0.329,0.398
+lsh_one_rest,20,5,20,1,True,0.107,0.044,0.099
+lsh_one_rest,20,5,20,5,True,0.224,0.104,0.226
+lsh_one_rest,20,5,20,10,True,0.221,0.184,0.254
