@@ -249,10 +249,10 @@ for category in os.listdir(model_dir):
                             ("period", end_file[index + 3]))
         else:
           model_style = "lsh_random"
-          reference_dict = (("classes", end_file[index + 3]),
-                            ("supports", end_file[index + 4]),
+          reference_dict = (("classes", end_file[index + 4]),
+                            ("supports", end_file[index + 5]),
                             ("planes", end_file[index + 2]),
-                            ("training", end_file[index + 5]))
+                            ("training", end_file[index + 3]))
       index+=1
     
     for method in hashing_methods:

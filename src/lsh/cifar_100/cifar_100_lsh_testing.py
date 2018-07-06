@@ -230,15 +230,15 @@ for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
     data_file_name = "../../../data/csv/cifar_100_"+model_style+"_lsh_"+method+".csv"
     file_objs[data_file_name] = open(data_file_name, 'w')
     first_line = "method,model_classes,model_supports,"
-    if model_style == "one_rest":
+    if model_style == "lsh_one_rest":
       first_line += "period,"
-    elif model_style == "random":
+    elif model_style == "lsh_random":
       first_line += "model_planes,trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":
       first_line += "testing_planes,"
     first_line += "unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
-    file_objs[data_file_name].write(first_line + "\n")
+    #file_objs[data_file_name].write(first_line + "\n")
 
 models_done = set()
 for category in os.listdir(model_dir):
@@ -252,7 +252,6 @@ for category in os.listdir(model_dir):
       continue
 
     models_done.add(model_name)
-    
     SAVE_PATH = model_dir + "/" + category + "/" + model_name
 
     end_file = file_name.split("-")
@@ -273,190 +272,189 @@ for category in os.listdir(model_dir):
                             ("period", end_file[index + 3]))
         else:
           model_style = "lsh_random"
-          reference_dict = (("classes", end_file[index + 3]),
-                            ("supports", end_file[index + 4]),
+          reference_dict = (("classes", end_file[index + 4]),
+                            ("supports", end_file[index + 5]),
                             ("planes", end_file[index + 2]),
-                            ("training", end_file[index + 5]))
+                            ("training", end_file[index + 3]))
       index+=1
-  tf.reset_default_graph()
+    tf.reset_default_graph()
 
-  dataset = tf.placeholder(tf.float32, [None]+size)
+    dataset = tf.placeholder(tf.float32, [None]+size)
 
-  features = create_network(dataset, size)
+    features = create_network(dataset, size)
 
-  init = tf.global_variables_initializer()
+    init = tf.global_variables_initializer()
 
-  with tf.Session() as session:
-    session.run(init)
+    with tf.Session() as session:
+      session.run(init)
 
-    Saver = tf.train.Saver()
-    Saver.restore(session, SAVE_PATH)
-   
-    rawDataset = seen_train_images
-    seenRawLabels = seen_train_labels
+      Saver = tf.train.Saver()
+      Saver.restore(session, SAVE_PATH)
+     
+      rawDataset = seen_train_images
+      seenRawLabels = seen_train_labels
 
-    seenFeatureVectors = None
-    for i in range(int(len(rawDataset)/1000)):
-      FEAT = (session.run([features], feed_dict =
-        {dataset: rawDataset[i*1000:(i+1)*1000]}))
-      FEAT = np.asarray(FEAT)
-      if seenFeatureVectors is None:
-        seenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
-          FEAT.shape[3], FEAT.shape[4]])
-      seenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-    seenFeatureVectors = np.reshape(seenFeatureVectors, (len(rawDataset), -1))  
+      seenFeatureVectors = None
+      for i in range(int(len(rawDataset)/1000)):
+        FEAT = (session.run([features], feed_dict =
+          {dataset: rawDataset[i*1000:(i+1)*1000]}))
+        FEAT = np.asarray(FEAT)
+        if seenFeatureVectors is None:
+          seenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
+            FEAT.shape[3], FEAT.shape[4]])
+        seenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+      seenFeatureVectors = np.reshape(seenFeatureVectors, (len(rawDataset), -1))  
 
-    queryDataset = seen_test_images
-    seenQueryLabels = seen_test_labels
+      queryDataset = seen_test_images
+      seenQueryLabels = seen_test_labels
 
-    seenQueryFeatureVectors = None
-    for i in range(int(len(queryDataset)/1000)):
-      FEAT = (session.run([features], feed_dict =
-        {dataset: queryDataset[i*1000:(i+1)*1000]}))
-      FEAT = np.asarray(FEAT)
-      if seenQueryFeatureVectors is None:
-        seenQueryFeatureVectors = np.empty([len(queryDataset), 
-          FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
-      seenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-    seenQueryFeatureVectors = np.reshape(seenQueryFeatureVectors, (len(queryDataset), -1))
+      seenQueryFeatureVectors = None
+      for i in range(int(len(queryDataset)/1000)):
+        FEAT = (session.run([features], feed_dict =
+          {dataset: queryDataset[i*1000:(i+1)*1000]}))
+        FEAT = np.asarray(FEAT)
+        if seenQueryFeatureVectors is None:
+          seenQueryFeatureVectors = np.empty([len(queryDataset), 
+            FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+        seenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+      seenQueryFeatureVectors = np.reshape(seenQueryFeatureVectors, (len(queryDataset), -1))
 
-    rawDataset = unseen_train_images
-    unseenRawLabels = unseen_train_labels
+      rawDataset = unseen_train_images
+      unseenRawLabels = unseen_train_labels
 
-    unseenFeatureVectors = None
-    for i in range(int(len(rawDataset)/1000)):
-      FEAT = (session.run([features], feed_dict =
-        {dataset: rawDataset[i*1000:(i+1)*1000]}))
-      FEAT = np.asarray(FEAT)
-      if unseenFeatureVectors is None:
-        unseenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
-          FEAT.shape[3], FEAT.shape[4]])
-      unseenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-    unseenFeatureVectors = np.reshape(unseenFeatureVectors, (len(rawDataset), -1))  
+      unseenFeatureVectors = None
+      for i in range(int(len(rawDataset)/1000)):
+        FEAT = (session.run([features], feed_dict =
+          {dataset: rawDataset[i*1000:(i+1)*1000]}))
+        FEAT = np.asarray(FEAT)
+        if unseenFeatureVectors is None:
+          unseenFeatureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
+            FEAT.shape[3], FEAT.shape[4]])
+        unseenFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+      unseenFeatureVectors = np.reshape(unseenFeatureVectors, (len(rawDataset), -1))  
 
-    queryDataset = unseen_test_images
-    unseenQueryLabels = unseen_test_labels
+      queryDataset = unseen_test_images
+      unseenQueryLabels = unseen_test_labels
 
-    unseenQueryFeatureVectors = None
-    for i in range(int(len(queryDataset)/1000)):
-      FEAT = (session.run([features], feed_dict =
-        {dataset: queryDataset[i*1000:(i+1)*1000]}))
-      FEAT = np.asarray(FEAT)
-      if unseenQueryFeatureVectors is None:
-        unseenQueryFeatureVectors = np.empty([len(queryDataset), 
-          FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
-      unseenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
-    unseenQueryFeatureVectors = np.reshape(unseenQueryFeatureVectors, (len(queryDataset), -1))
+      unseenQueryFeatureVectors = None
+      for i in range(int(len(queryDataset)/1000)):
+        FEAT = (session.run([features], feed_dict =
+          {dataset: queryDataset[i*1000:(i+1)*1000]}))
+        FEAT = np.asarray(FEAT)
+        if unseenQueryFeatureVectors is None:
+          unseenQueryFeatureVectors = np.empty([len(queryDataset), 
+            FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+        unseenQueryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+      unseenQueryFeatureVectors = np.reshape(unseenQueryFeatureVectors, (len(queryDataset), -1))
 
-    for method in hashing_methods:
-      for nPlanes in nPlanes_list:
-        for nClasses in nClasses_list:
-          if method == "one_rest":
-            nPlanes = nClasses
-          for unseen in unseen_list:
-              if unseen:
-                train_images = unseen_train_images
-                train_labels = unseen_train_labels
-                featureVectors = unseenFeatureVectors
-                test_images = unseen_test_images
-                test_labels = unseen_test_labels
-                queryFeatureVectors = unseenQueryFeatureVectors
-              else:
-                train_images = seen_train_images
-                train_labels = seen_train_labels
-                featureVectors = seenFeatureVectors
-                test_images = seen_test_images
-                test_labels = seen_test_labels
-                queryFeatureVectors = seenQueryFeatureVectors
+      for method in hashing_methods:
+        for nPlanes in nPlanes_list:
+          for nClasses in nClasses_list:
+            if method == "one_rest":
+              nPlanes = nClasses
+            for unseen in unseen_list:
+                if unseen:
+                  train_images = unseen_train_images
+                  train_labels = unseen_train_labels
+                  featureVectors = unseenFeatureVectors
+                  test_images = unseen_test_images
+                  test_labels = unseen_test_labels
+                  queryFeatureVectors = unseenQueryFeatureVectors
+                else:
+                  train_images = seen_train_images
+                  train_labels = seen_train_labels
+                  featureVectors = seenFeatureVectors
+                  test_images = seen_test_images
+                  test_labels = seen_test_labels
+                  queryFeatureVectors = seenQueryFeatureVectors
 
-              for nSuppImgs in nSuppImgs_list:
-
-                nSupp = nClasses * nSuppImgs
-                sumEff = 0
-                cos_acc = 0
-                lsh_acc = 0
-                lsh_acc2 = 0
-                # choose random support vectors
-                supp = []
-                supp_labels = []
-                images = []
-                while len(images) < nClasses:
-                  choice = random.choice(train_labels)
-                  while choice in images:
+                for nSuppImgs in nSuppImgs_list:
+                  nSupp = nClasses * nSuppImgs
+                  sumEff = 0
+                  cos_acc = 0
+                  lsh_acc = 0
+                  lsh_acc2 = 0
+                  # choose random support vectors
+                  supp = []
+                  supp_labels = []
+                  images = []
+                  while len(images) < nClasses:
                     choice = random.choice(train_labels)
-                  n = 0
-                  while n < nSuppImgs:
-                    supp_index = random.randint(0, train_images.shape[0] - 1)
-                    while int(train_labels[supp_index]) != choice:
-                      supp_index += 1
-                      if supp_index == len(train_images):
-                        supp_index = 0
-                    n += 1
-                    supp.append(featureVectors[supp_index])
-                    supp_labels.append(int(train_labels[supp_index]))
-                  images.append(choice)
+                    while choice in images:
+                      choice = random.choice(train_labels)
+                    n = 0
+                    while n < nSuppImgs:
+                      supp_index = random.randint(0, train_images.shape[0] - 1)
+                      while int(train_labels[supp_index]) != choice:
+                        supp_index += 1
+                        if supp_index == len(train_images):
+                          supp_index = 0
+                      n += 1
+                      supp.append(featureVectors[supp_index])
+                      supp_labels.append(int(train_labels[supp_index]))
+                    images.append(choice)
 
-                if method == "random":
-                  lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], supp_labels)
-                elif method == "one_rest":
-                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(images, supp, supp_labels)
+                  if method == "random":
+                    lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], supp_labels)
+                  elif method == "one_rest":
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(images, supp, supp_labels)
 
-                for i in range(nTrials):
-                  # choose random query
-                  query_value = random.choice(images)
-                  query_index = random.randint(0, test_images.shape[0] - 1)
-                  while query_value != int(test_labels[query_index]):
-                    query_index += 1
-                    if query_index == len(test_images):
-                      query_index = 0
-                  query = queryFeatureVectors[query_index]
-                  query_label = test_labels[query_index]
-                  # get lsh binaries (from application to matrix) for supp and query
-                  lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
-                  lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes, lsh_offset_vals)
+                  for i in range(nTrials):
+                    # choose random query
+                    query_value = random.choice(images)
+                    query_index = random.randint(0, test_images.shape[0] - 1)
+                    while query_value != int(test_labels[query_index]):
+                      query_index += 1
+                      if query_index == len(test_images):
+                        query_index = 0
+                    query = queryFeatureVectors[query_index]
+                    query_label = test_labels[query_index]
+                    # get lsh binaries (from application to matrix) for supp and query
+                    lsh_bin, lsh_vec = lsh_hash(np.asarray(supp), lsh_planes, lsh_offset_vals)
+                    lsh_bin_q, lsh_vec_q = lsh_hash(np.asarray(query), lsh_planes, lsh_offset_vals)
 
-                  # calculate lsh distances
-                  # find closest match
-                  distances, distances2 = lsh_dist(lsh_bin, lsh_bin_q, lsh_vec, lsh_vec_q, nPlanes)
-                  maximum = max(distances)
-                  LSHMatch = supp_labels[np.argmax(distances)]
-                  LSHMatch2 = supp_labels[np.argmax(distances2)]
-                  q_list = []
-                  for j in range(nSupp):
-                    q_list.append(query)
-                  q_list = np.asarray(q_list)
-                
-                  # find closest match
-                  cosDistances = cos_similarities(supp, q_list)
-                  cosMatch = supp_labels[np.argmax(cosDistances)]
-               
-                  if cosMatch == query_label:
-                    cos_acc += 1
-                
-                  if cosMatch == LSHMatch:
-                    sumEff += 1
-                
-                  if LSHMatch == query_label:
-                    lsh_acc+=1
+                    # calculate lsh distances
+                    # find closest match
+                    distances, distances2 = lsh_dist(lsh_bin, lsh_bin_q, lsh_vec, lsh_vec_q, nPlanes)
+                    maximum = max(distances)
+                    LSHMatch = supp_labels[np.argmax(distances)]
+                    LSHMatch2 = supp_labels[np.argmax(distances2)]
+                    q_list = []
+                    for j in range(nSupp):
+                      q_list.append(query)
+                    q_list = np.asarray(q_list)
+                  
+                    # find closest match
+                    cosDistances = cos_similarities(supp, q_list)
+                    cosMatch = supp_labels[np.argmax(cosDistances)]
+                 
+                    if cosMatch == query_label:
+                      cos_acc += 1
+                  
+                    if cosMatch == LSHMatch:
+                      sumEff += 1
+                  
+                    if LSHMatch == query_label:
+                      lsh_acc+=1
 
-                  if LSHMatch2 == query_label:
-                    lsh_acc2+=1   
+                    if LSHMatch2 == query_label:
+                      lsh_acc2+=1   
 
-                cos_lsh_acc = float(cos_acc)/(nTrials)
-                calc_lsh_acc = float(lsh_acc)/(nTrials)
-                calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                eff = float(sumEff) / nTrials
-                output_file = "../../../data/csv/cifar_100_"+model_style+"_lsh_"+method+".csv"
-                output="lsh_"+method+","
-                for i in reference_dict:
-                  output += i[1] + ","
-                output += str(nClasses)+","+str(nSuppImgs)+","
-                if method == "random":
-                  output+=str(nPlanes)+","
-                output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
-                file_objs[output_file].write(output + "\n")
-        if method == "one_rest":
-          break
+                  cos_lsh_acc = float(cos_acc)/(nTrials)
+                  calc_lsh_acc = float(lsh_acc)/(nTrials)
+                  calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
+                  eff = float(sumEff) / nTrials
+                  output_file = "../../../data/csv/cifar_100_"+model_style+"_lsh_"+method+".csv"
+                  output="lsh_"+method+","
+                  for i in reference_dict:
+                    output += i[1] + ","
+                  output += str(nClasses)+","+str(nSuppImgs)+","
+                  if method == "random":
+                    output+=str(nPlanes)+","
+                  output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
+                  file_objs[output_file].write(output + "\n")
+          if method == "one_rest":
+            break
 
 for file_obj in file_objs.keys():
   file_objs[file_obj].close()
