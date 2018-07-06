@@ -231,14 +231,14 @@ for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
     file_objs[data_file_name] = open(data_file_name, 'w')
     first_line = "method,model_classes,model_supports,"
     if model_style == "lsh_one_rest":
-      first_line += "period,"
+      first_line += "model_period,"
     elif model_style == "lsh_random":
-      first_line += "model_planes,trained_planes,"
+      first_line += "model_planes,model_trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":
       first_line += "testing_planes,"
     first_line += "unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
-    #file_objs[data_file_name].write(first_line + "\n")
+    file_objs[data_file_name].write(first_line + "\n")
 
 models_done = set()
 for category in os.listdir(model_dir):

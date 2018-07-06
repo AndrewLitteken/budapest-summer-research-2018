@@ -233,9 +233,9 @@ for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
     file_objs[data_file_name] = open(data_file_name, 'w')
     first_line = "method,model_classes,model_supports,"
     if model_style == "one_rest":
-      first_line += "period,"
+      first_line += "model_period,"
     elif model_style == "random":
-      first_line += "model_planes,trained_planes,"
+      first_line += "model_planes,model_trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":
       first_line += "testing_planes,"
