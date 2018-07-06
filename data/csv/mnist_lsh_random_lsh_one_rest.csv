@@ -1,4 +1,4 @@
-method,model_classes,model_supports,testing_classes,testing_supports,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
+method,model_classes,model_supports,model_planes,model_training,testing_classes,testing_supports,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
 lsh_one_rest,6,1,100,True,2,1,True,0.879,0.823,0.823
 lsh_one_rest,6,1,100,True,2,5,True,0.977,0.974,0.974
 lsh_one_rest,6,1,100,True,2,10,True,0.988,0.986,0.986
