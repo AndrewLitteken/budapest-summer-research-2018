@@ -178,7 +178,7 @@ for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
     if model_style == "lsh_one_rest":
       first_line += "period,"
     elif model_style == "lsh_random":
-      first_line += "model_planes,trained_planes,"
+      first_line += "model_planes,model_trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":
       first_line += "testing_planes,"
