@@ -65,7 +65,7 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "cifar-lsh-one-rest"
+    base = a + "cifar-lsh-one-rest-"
   elif o in ("-p", "--period_length"):
     period = int(a)
   elif o in ("-i", "--num_iterations"):
