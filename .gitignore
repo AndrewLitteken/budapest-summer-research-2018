@@ -7,6 +7,6 @@
 *.pyc
 *.script
 *.o*
-testing-data/omniglot/*/*/*_*_90.png
-testing-data/omniglot/*/*/*_*_180.png
-testing-data/omniglot/*/*/*_*_270.png
+testing-data/omniglot/*/*/*/*_*_90.png
+testing-data/omniglot/*/*/*/*_*_180.png
+testing-data/omniglot/*/*/*/*_*_270.png
