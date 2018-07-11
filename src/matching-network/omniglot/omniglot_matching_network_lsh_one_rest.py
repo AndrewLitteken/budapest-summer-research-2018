@@ -201,7 +201,8 @@ for k in range(nClasses):
 
     # Apply the LSH Values
     support_lsh = tf.matmul(support_shaped, lsh_planes)
-    support_lsh = tf.subtract(support_lsh, lsh_offsets)
+    #support_lsh = tf.subtract(support_lsh, lsh_offsets)
+    support_lsh = tf.add(support_lsh, lsh_offsets)
    
     # This must be done so that we have a simple way to compare all supports
     # to one query
@@ -311,7 +312,8 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
       print("BAD. Temp_vec not set, which doesn't make sense.")
     
     temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[index_i])
-    lsh_offset_vals.append(temp_mul)
+    #lsh_offset_vals.append(temp_mul)
+    lsh_offset_vals.append(clf.intercept_[0])
 
   lsh_matrix = np.transpose(lsh_matrix)
   return lsh_matrix, lsh_offset_vals

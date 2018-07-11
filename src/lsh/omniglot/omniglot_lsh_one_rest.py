@@ -78,6 +78,7 @@ def get_images():
   np.random.shuffle(list_range)
   for i in list_range:
     test_images.append(raw_test_images[i])
+    test_labels.append(raw_test_labels[i])
   
   return train_images, train_labels, test_images, test_labels
 
@@ -227,13 +228,15 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
       print("BAD. Temp_vec not set, which doesn't make sense.")
     
     temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[index_i])
-    lsh_offset_vals.append(temp_mul)
+    lsh_offset_vals.append(clf.intercept_[0])
+    #lsh_offset_vals.append(temp_mul)
 
   return lsh_matrix, lsh_offset_vals
 
 def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
   lsh_vectors = np.matmul(feature_vectors, np.transpose(LSH_matrix))
-  lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
+  lsh_vectors = np.add(lsh_vectors, lsh_offset_vals)
+  #lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
   lsh_bin = np.sign(lsh_vectors)
   lsh_bin = np.clip(lsh_bin, 0, 1)
   return lsh_bin, lsh_vectors
@@ -350,6 +353,10 @@ for i in range(nTrials):
   # find closest match
   distances, distances2 = lsh_dist(lsh_bin, lsh_bin_q, lsh_vec, lsh_vec_q)
   maximum = max(distances)
+  LSHMatches = set()
+  for index, distance in enumerate(distances):
+    if distance == maximum:
+      LSHMatches.add(supp_labels[index])
   LSHMatch = supp_labels[np.argmax(distances)]
   LSHMatch2 = supp_labels[np.argmax(distances2)]
   q_list = []
@@ -367,7 +374,10 @@ for i in range(nTrials):
   if cosMatch == LSHMatch:
     sumEff += 1
   
-  if LSHMatch == query_label:
+  #if query_label in LSHMatches:
+  #  lsh_acc+=1
+
+  if query_label == LSHMatch:
     lsh_acc+=1
 
   if LSHMatch2 == query_label:

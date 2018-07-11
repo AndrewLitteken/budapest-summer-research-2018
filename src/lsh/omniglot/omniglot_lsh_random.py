@@ -213,7 +213,7 @@ def lsh_dist(lshSupp, lshQueryO, lshVecSupp, lshVecQuery):
   dist = np.equal(lshSupp, lshQuery)
   dist = np.sum(dist.astype(int), 1)
   dist_2 = np.multiply(lshVecSupp, lshQuery2)
-  dist2 = np.divide(1.0, np.add(1.0, np.exp(np.multiply(-50.0, dist_2))))
+  dist2 = np.divide(1.0, np.add(1.0, np.exp(np.multiply(-1.0, dist_2))))
   dist2 = np.sum(dist2, 1)  # check this!
   return dist, dist2
 
@@ -314,6 +314,10 @@ for i in range(nTrials):
   # find closest match
   distances, distances2 = lsh_dist(lsh_bin, lsh_bin_q, lsh_vec, lsh_vec_q)
   maximum = max(distances)
+  LSHMatches = set()
+  for index, distance in enumerate(distances):
+    if distance == maximum:
+      LSHMatches.add(supp_labels[index])
   LSHMatch = supp_labels[np.argmax(distances)]
   LSHMatch2 = supp_labels[np.argmax(distances2)]
 
@@ -326,7 +330,7 @@ for i in range(nTrials):
   # find closest match with cosine
   cosDistances = cos_similarities(supp, q_list)
   cosMatch = supp_labels[np.argmax(cosDistances)]
- 
+
   if cosMatch == query_label:
     cos_acc += 1
   
@@ -338,7 +342,6 @@ for i in range(nTrials):
 
   if LSHMatch2 == query_label:
     lsh_acc2+=1
-
 #print("Cos Acc: "+str(float(cos_acc)/(nTrials) * 100)+"%")
 #print("LSH Acc: "+str(float(lsh_acc)/(nTrials) * 100)+"%")
 #print("LSH Acc2: "+str(float(lsh_acc2)/(nTrials) * 100)+"%")
