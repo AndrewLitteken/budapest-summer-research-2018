@@ -10,7 +10,7 @@ import math
 import sys
 import os
 
-train_file_path = "../../../testing-data/omniglot/"
+train_file_path = "../../../testing-data/omniglot-rotate/"
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
@@ -62,7 +62,7 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "omniglot-bactch-cosine-"
+    base = a + "omniglot-batch-cosine-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
   elif o in ("-h", "--help"):
