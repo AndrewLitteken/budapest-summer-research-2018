@@ -150,10 +150,7 @@ def create_network(img, size, First = False):
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
       convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
-      convR = tf.add(convR, bias)
       beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))
       gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))
       mean, variance = tf.nn.moments(convR, [0,1,2])

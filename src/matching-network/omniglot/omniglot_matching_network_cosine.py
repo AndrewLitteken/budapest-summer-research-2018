@@ -33,7 +33,6 @@ def make_dir_list(data_dir):
 
   return np.asarray(train_dirs), np.asarray(test_dirs)
 
-train_images, test_images = make_dir_list(train_file_path)
 
 # Graph Constants
 size = [28, 28, 1]
@@ -53,7 +52,7 @@ nImgsSuppClass = 5
 
 base = "/tmp/omniglot-cosine-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hdc:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "base_path=", "num_iterations="])
 
 for o, a in opts:
@@ -65,11 +64,15 @@ for o, a in opts:
     base = a + "omniglot-cosine-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-d", "--data"):
+    train_file_path = "../../../testing-data/omniglot-rotate/"
   elif o in ("-h", "--help"):
     help_message()
   else:
     print("unhandled option: "+o)
     help_message()
+
+train_images, test_images = make_dir_list(train_file_path)
 
 SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
 

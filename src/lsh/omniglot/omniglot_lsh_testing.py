@@ -429,5 +429,5 @@ for category in os.listdir(model_dir):
         if method == "one_rest":
           break
 
-for file_obj in file_obs.keys():
+for file_obj in file_objs.keys():
   file_objs[file_obj].close()     

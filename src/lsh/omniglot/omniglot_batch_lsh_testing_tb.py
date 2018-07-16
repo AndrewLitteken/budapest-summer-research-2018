@@ -444,7 +444,7 @@ for category in os.listdir(model_dir):
                     query_label = sourceLabels[query_index]
 
                     if i == 1:
-                      writer = tf.summary.FileWriter(LOG_DIR + "/" + method + "/" + str(i), session.graph)
+                      writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
                       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
                       run_metadata = tf.RunMetadata()
                       cosDistances, distancesTrue, distancesSig = session.run(
