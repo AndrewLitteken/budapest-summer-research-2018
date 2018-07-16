@@ -257,6 +257,8 @@ with tf.Session() as session:
   queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), 
     -1))
 
+tf.reset_default_graph()
+
 sumEff = 0
 
 cos_acc = 0
