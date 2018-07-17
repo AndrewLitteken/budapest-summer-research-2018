@@ -187,22 +187,7 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
       
     lsh_matrix.append(clf.coef_[0])
     
-    # create offset value
-    temp_vec_is_set = False
-    # number of dimensions of the space
-    temp_vec = [0]*len(feature_vectors[0])
-    for j in range(0, len(feature_vectors[0])):
-      # if never enters this if statement, that is an error
-      if clf.coef_[0][j] != 0 and not temp_vec_is_set:
-        temp_vec[j] = -1*clf.intercept_[0] / clf.coef_[0][j]
-        temp_vec_is_set = True
-        break 
-     
-    if (not temp_vec_is_set): 
-      print("BAD. Temp_vec not set, which doesn't make sense.")
-    
-    temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[index_i])
-    lsh_offset_vals.append(temp_mul)
+    lsh_offset_vals.append(clf.intercept_[0])
 
   return lsh_matrix, lsh_offset_vals
 
@@ -211,7 +196,7 @@ def gen_lsh_random_planes(num_planes, feature_vectors, labels):
 
 def lsh_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
   lsh_vectors = np.matmul(feature_vectors, np.transpose(LSH_matrix))
-  lsh_vectors = np.subtract(lsh_vectors, lsh_offset_vals)
+  lsh_vectors = np.add(lsh_vectors, lsh_offset_vals)
   lsh_bin = np.sign(lsh_vectors)
   lsh_bin = np.clip(lsh_bin, 0, 1)
   return lsh_bin, lsh_vectors
