@@ -95,10 +95,11 @@ nTrials = 1000
 hashing_methods=["random", "one_rest"]
 unseen_list = [False]
 model_dir = None
+one_model = True
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",
-  "num_planes_list=","unseen_list=","model_dir=", "hashing_methods="])
+  "num_planes_list=","unseen_list=","model_dir=", "hashing_methods=","model_loc="])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
@@ -115,6 +116,9 @@ for o, a in opts:
     unseen_list = [True for i in a.split(",") if i == "True"]
   elif o in ("-d", "--model_dir"):
     model_dir = a
+  elif o in ("-l", "--model_loc"):
+    model_dir = a
+    one_model = True
   elif o in ("-m", "--hashing_methods"):
     hashing_methods = [i for i in a.split(",") if (i == "one_rest" or 
       i == "random")]
@@ -136,11 +140,8 @@ def create_network(img, size, First = False):
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
       convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
         padding= "SAME")
-      convR = tf.add(convR, bias)
       beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))     
       gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))     
       mean, variance = tf.nn.moments(convR, [0,1,2])
@@ -231,7 +232,7 @@ def lsh_dist(lshSupp, lshQueryO, lshVecSupp, lshVecQuery, nPlanes):
   return dist, dist2
 
 file_objs = {}
-for model_style in ["cosine"]#, "lsh_random", "lsh_one_rest"]:
+for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
     data_file_name = "../../../data/csv/omniglot_normalization_"+model_style+"_lsh_"+method+".csv"
     file_objs[data_file_name] = open(data_file_name, 'w')
@@ -246,20 +247,34 @@ for model_style in ["cosine"]#, "lsh_random", "lsh_one_rest"]:
     first_line += "unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
     file_objs[data_file_name].write(first_line + "\n")
 
+if one_model:
+  model_list = ["one"]
+else:
+  model_list = os.listdir(model_dir)
 models_done = set()
-for category in os.listdir(model_dir):
-  for file_name in os.listdir(model_dir + "/" + category):
+for category in model_list:
+  if one_model:
+    categories = [""]
+  else:
+    categories = os.listdir(model_dir + "/" + category)
+    if category[0] == ".":
+      continue
+  for file_name in categories:
+    if one_model:
+      file_name = model_dir.split("/")[-1]
     if "cosine" not in file_name and "lsh" not in file_name:
       continue
 
     model_name = file_name.split(".")[0]
-    
+
     if model_name in models_done:
       continue
 
     models_done.add(model_name)
-    
-    SAVE_PATH = model_dir + "/" + category + "/" + model_name
+    if one_model:
+      SAVE_PATH = model_dir
+    else:
+      SAVE_PATH = model_dir + "/" + category + "/" + model_name 
 
     end_file = file_name.split("-")
 
@@ -421,7 +436,7 @@ for category in os.listdir(model_dir):
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
                 eff = float(sumEff) / nTrials
-                output_file = "../../../data/csv/omniglot_batch_"+model_style+"_lsh_"+method+".csv"
+                output_file = "../../../data/csv/omniglot_normalization_"+model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 for i in reference_dict:
                   output += i[1] + ","
@@ -429,7 +444,8 @@ for category in os.listdir(model_dir):
                 if method == "random":
                   output+=str(nPlanes)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
-                file_objs[output_file].write(output + "\n")
+                print(output)
+                #file_objs[output_file].write(output + "\n")
         if method == "one_rest":
           break
 

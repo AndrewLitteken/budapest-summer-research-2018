@@ -447,6 +447,26 @@ for category in model_list:
                   print(method)
 
                   for i in range(nTrials):
+                    supp = []
+                    supp_labels = []
+                    supp_indices = []
+                    while len(supp) < nClasses * nSuppImgs:
+                      supp_index = random.randint(0, len(sourceLabels) - 1)
+                      choice = sourceLabels[supp_index]
+                      while choice in supp_labels:
+                        supp_index = random.randint(0, len(sourceLabels) - 1)
+                        choice = sourceLabels[supp_index]
+                      n = 0
+                      change = 1
+                      while n < nSuppImgs:
+                        while sourceLabels[supp_index] != choice:
+                          supp_index += 1
+                          if supp_index == len(sourceLabels):
+                            supp_index = 0
+                        n += 1
+                        supp.append(sourceVectors[supp_index])
+                        supp_labels.append(sourceLabels[supp_index])
+                        supp_indices.append(supp_index)
                     # choose random query
                     query_value = random.choice(supp_labels)
                     query_index = random.randint(0, len(sourceLabels) - 1)
