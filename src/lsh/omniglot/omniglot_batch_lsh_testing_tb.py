@@ -96,8 +96,9 @@ nTrials = 1000
 hashing_methods=["random"]#, "one_rest"]
 unseen_list = [False]
 model_dir = None
+one_model = True
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",
   "num_planes_list=","unseen_list=","model_dir=", "hashing_methods="])
 
@@ -116,6 +117,9 @@ for o, a in opts:
     unseen_list = [True for i in a.split(",") if i == "True"]
   elif o in ("-d", "--model_dir"):
     model_dir = a
+  elif o in ("-l", "--model_loc"):
+    model_dir = a
+    one_model = True
   elif o in ("-m", "--hashing_methods"):
     hashing_methods = [i for i in a.split(",") if (i == "one_rest" or 
       i == "random")]
@@ -260,22 +264,32 @@ for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
     first_line += "unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
     file_objs[data_file_name].write(first_line + "\n")
 
+if one_model:
+  model_list = ["one"]
+else:
+  model_list = os.listdir(model_dir)
 models_done = set()
-for category in os.listdir(model_dir):
-  if category[0] == ".":
-    continue
-  for file_name in os.listdir(model_dir + "/" + category):
+for category in model_list:
+  if one_model:
+    categories = [""]
+  else:
+    categories = os.listdir(model_dir + "/" + category)
+  for file_name in categories:
+    if one_model:
+      file_name = model_dir.split("/")[-1]
     if "cosine" not in file_name and "lsh" not in file_name:
       continue
 
     model_name = file_name.split(".")[0]
-    
+
     if model_name in models_done:
       continue
 
     models_done.add(model_name)
-    
-    SAVE_PATH = model_dir + "/" + category + "/" + model_name
+    if one_model:
+      SAVE_PATH = model_dir
+    else:
+      SAVE_PATH = model_dir + "/" + category + "/" + model_name    
 
     end_file = file_name.split("-")
 
