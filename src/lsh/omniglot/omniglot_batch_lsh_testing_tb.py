@@ -93,10 +93,10 @@ nSuppImgs_list = [5]
 nSupportTraining = 10000
 nTrials = 1000
 
-hashing_methods=["random"]#, "one_rest"]
+hashing_methods=["random", "one_rest"]
 unseen_list = [False]
 model_dir = None
-one_model = True
+one_model = False
 
 opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",

@@ -274,7 +274,7 @@ else:
   sourceLabels = rawLabels
 
 lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, 
-  supp, supp_labels)
+  sourceVectors, sourceLabels)
 
 for i in range(nTrials):
   supp = []

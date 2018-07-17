@@ -93,10 +93,10 @@ nSuppImgs_list = [5]
 nSupportTraining = 10000
 nTrials = 1000
 
-hashing_methods=["random"]#, "one_rest"]
+hashing_methods=["random", "one_rest"]
 unseen_list = [False]
 model_dir = None
-one_model = True
+one_model = False
 
 opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",
@@ -206,10 +206,10 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
     temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[index_i])
     lsh_offset_vals.append(clf.intercept_[0])
 
-  return lsh_matrix, lsh_offset_vals
+  return np.transpose(lsh_matrix), lsh_offset_vals
 
 def gen_lsh_random_planes(num_planes, feature_vectors, labels):
-  return np.transpose((np.matlib.rand(feature_vectors.shape[-1], num_planes) - 0.5) * 2), np.zeros(num_planes)
+  return (np.matlib.rand(feature_vectors.shape[-1], num_planes) - 0.5) * 2, np.zeros(num_planes)
 
 def lsh_true_hash(lsh_bin):
   with tf.name_scope("true_lsh_hashing"):
@@ -439,7 +439,6 @@ for category in model_list:
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
 
-                lsh_planes = np.transpose(lsh_planes)
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
                   print(method)
@@ -478,6 +477,7 @@ for category in model_list:
                     query = sourceVectors[query_index]
                     query_label = sourceLabels[query_index]
 
+                    #lsh_planes = np.transpose(lsh_planes)
                     if i == 1:
                       writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
                       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)

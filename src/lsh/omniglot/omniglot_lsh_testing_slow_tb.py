@@ -96,7 +96,7 @@ nTrials = 1000
 hashing_methods=["random"]#, "one_rest"]
 unseen_list = [False]
 model_dir = None
-one_model = True
+one_model = False
 
 opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",
@@ -467,6 +467,7 @@ for category in model_list:
 
                     if method == "one_rest":
                       lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
+                      lsh_planes = np.transpose(lsh_planes)
                     # choose random query
                     query_value = random.choice(supp_labels)
                     query_index = random.randint(0, len(sourceLabels) - 1)

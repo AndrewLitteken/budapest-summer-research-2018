@@ -365,8 +365,6 @@ for category in model_list:
 
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
-                elif method == "one_rest":
-                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
 
                 for i in range(nTrials):
                   supp = []
@@ -389,7 +387,9 @@ for category in model_list:
                       supp.append(sourceVectors[supp_index])
                       supp_labels.append(sourceLabels[supp_index])
                       supp_indices.append(supp_index)
-
+                  
+                  if method == "one_rest":
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
                   # choose random query
                   query_value = random.choice(supp_labels)
                   query_index = random.randint(0, len(sourceLabels) - 1)

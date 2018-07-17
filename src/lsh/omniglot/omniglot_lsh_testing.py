@@ -97,7 +97,7 @@ unseen_list = [False]
 model_dir = None
 
 model_dir = None
-one_model = True
+one_model = False
 
 opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",
