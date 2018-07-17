@@ -368,21 +368,40 @@ for category in model_list:
 
                 nSupp = nClasses * nSuppImgs
 
-                support_vectors = tf.placeholder(tf.float32, [nSupp, featureVectors.shape[1]], name = "support_feature_vectors")
-                query_vector = tf.placeholder(tf.float32, [1, queryFeatureVectors.shape[1]], name = "query_feature_vector")
-                lsh_planes_tf = tf.placeholder(tf.float32, [nPlanes, queryFeatureVectors.shape[1]], name = "lsh_planes")
-                lsh_offsets_tf = tf.placeholder(tf.float32, [nPlanes], name = "lsh_offsets")
+                with tf.name_scope("support_setup"):
+                  support_vectors = tf.placeholder(tf.float32, [nSupp, featureVectors.shape[1]], name = "support_feature_vectors")
+                  lsh_planes_tf = tf.placeholder(tf.float32, [queryFeatureVectors.shape[1], nPlanes], name = "lsh_planes")
+                  lsh_offsets_tf = tf.placeholder(tf.float32, [nPlanes], name = "lsh_offsets")
 
-                with tf.name_scope("cosine"):
-                  cosine_distances = cos_similarities(support_vectors, query_vector)
-                with tf.name_scope("true_lsh"):
-                  supp_true = lsh_true_hash(support_vectors, lsh_planes_tf, lsh_offsets_tf)
-                  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
-                  true_lsh_distances = true_lsh_dist(supp_true, query_true)
-                with tf.name_scope("sigmoid_lsh"):
                   supp_sig = lsh_sig_hash(support_vectors, lsh_planes_tf, lsh_offsets_tf)
-                  query_sig = lsh_sig_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
-                  sigmoid_lsh_distances = sigmoid_lsh_dist(supp_sig, query_sig)
+                  supp_true = lsh_true_hash(supp_sig)
+
+                query_vector = tf.placeholder(tf.float32, [1, queryFeatureVectors.shape[1]], name = "query_feature_vector")
+                summary = tf.summary.merge_all()
+                #with tf.name_scope("cosine"):
+                #  with tf.name_scope("cosine_distance"):
+                dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
+                supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
+                cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
+                  
+                #with tf.name_scope("true_lsh"):
+                #  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf, "")
+                #  true_lsh_distances = true_lsh_dist(supp_true, query_true)
+                #with tf.name_scope("first_hash"):
+                lsh_vector = lsh_sig_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
+                #with tf.name_scope("true_lsh_equal"):
+                  #with tf.name_scope("true_lsh_hashing"):
+                lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
+                lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
+                lsh_bin = tf.cast(lsh_bin, bool)
+                  #with tf.name_scope("true_lsh_distance"):
+                dist = tf.equal(supp_true, lsh_bin)
+                true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
+                #with tf.name_scope("sigmoid_lsh"):
+                  #with tf.name_scope("sigmoid_lsh_distance"):
+                dist_2 = tf.multiply(supp_sig, lsh_vector)
+                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+                sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
                 sumEff = 0
                 cos_acc = 0
                 lsh_acc = 0
@@ -432,9 +451,22 @@ for category in model_list:
                   query = sourceVectors[query_index]
                   query_label = sourceLabels[query_index]
                 
-                  with tf.Session() as session:
-                    cosDistances, distancesTrue, distancesSig = session.run(
-                      [cosine_distances, true_lsh_distances,
+                  if i == 1:
+                      writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
+                      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+                      run_metadata = tf.RunMetadata()
+                      cosDistances, distancesTrue, distancesSig = session.run(
+                      [cosine_distances, true_lsh_distances, #true_lsh_distances_equal,
+                      sigmoid_lsh_distances], feed_dict = {
+                      query_vector: [query],
+                      support_vectors: supp,
+                      lsh_planes_tf: lsh_planes,
+                      lsh_offsets_tf: lsh_offset_vals
+                      }, options = runOptions, run_metadata=run_metadata)
+                      writer.add_run_metadata(run_metadata, 'step%d' % i)
+                    else:
+                      cosDistances, distancesTrue, distancesSig = session.run(
+                      [cosine_distances, true_lsh_distances, #true_lsh_distances_equal,
                       sigmoid_lsh_distances], feed_dict = {
                       query_vector: [query],
                       support_vectors: supp,
