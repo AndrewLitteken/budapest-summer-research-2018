@@ -14,7 +14,11 @@ import random
 import math
 import sys
 
-train_file_path = "../../../testing-data/omniglot/"
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+split_path = dir_path.split("/")
+base_path = "/".join(split_path[:-3])
+train_file_path = base_path+"/testing-data/omniglot/"
 LOG_DIR = "./omniglot_testing"
 
 def make_dir_list(data_dir):
@@ -82,7 +86,6 @@ def get_images():
 
   return train_images, train_labels, test_images, test_labels
 
-train_images, train_labels, test_images, test_labels = get_images()
 # LSH Testing
 batchS = 32
 nPlanes_list = [500] 
@@ -93,23 +96,52 @@ nSupportTraining = 10000
 nTrials = 1000
 
 hashing_methods=["random", "one_rest"]
-unseen_list = [False]
+unseen_list = {True}
 model_dir = None
 one_model = False
 file_write = False
+file_write_path = None
 tensorboard = True
 integer_range_list = [1000]
 integer_change = False
+new_set = False
+batch_norm = False
 
-opts, args = getopt.getopt(sys.argv[1:], "hftc:r:v:s:p:a:u:d:m:l:", ["help", 
-  "num_classes_list=", "num_supports_list=", "num_iterations=",
-  "num_planes_list=","unseen_list=","model_dir=", "hashing_methods=","model_loc=","--integer_range="])
+def help_message():
+  print("Testing Suite LSH Hashing for variable number of items\n")
+
+  print("lists are comma separated values")
+
+  print("Options:")
+  print("-f,--file_write:         write info to file")
+  print("-b,--batch_norm:         use batch norm model")
+  print("-t,--tensorboard:        write info to file")
+  print("-c,--num_classes_list:   input list of classes")
+  print("-r,--integer_range:      list of ranges for integers for plane")
+  print("-s,--num_supports_list:  input list of supports")
+  print("-p,--num_planes_list:    input list of number of planes")
+  print("-u,--unseen_list:        list of True False to for unseen data")
+  print("-d,--model_dir:          directory with list of models")
+  print("-l,--model_loc:          path to model location")
+  print("-m,--hashing_methods:    list of hashing methods to use")
+  print("-i,--num_iterations:     number of test iterations")
+  print("-n,--new_support_set:    get new support set for each trial")
+  print("")
+  exit(1)
+
+opts, args = getopt.getopt(sys.argv[1:], "hbvf:t:c:r:s:p:u:d:i:m:l:", ["help", 
+  "batch_norm","new_support_set","num_classes_list=", "num_supports_list=", 
+  "num_iterations=","num_planes_list=","unseen_list=","model_dir=",
+  "hashing_methods=","model_loc=","integer_range=","tensorboard=",
+  "file_write="])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
     nClasses_list = [int(i) for i in a.split(",")]
   elif o in ("-f", "--file_write"):
     file_write = True
+    if a and a[0] != "-":
+      file_write_path = a
   elif o in ("--integer_range", "-r"):
     integer_range_list = [int(i) for i in a.split(",")]
     integer_change = True
@@ -122,23 +154,38 @@ for o, a in opts:
   elif o in ("-h", "--help"):
     help_message()
   elif o in ("-u", "--unseen"):
-    unseen_list = [True for i in a.split(",") if i == "True"]
+    [unseen_list.add(True) if i == "True" else unseen_list.add(False) for i in a.split(",")]
   elif o in ("-d", "--model_dir"):
+    if one_model:
+      print("using predetermined model location")
+      continue
     model_dir = a
   elif o in ("-t", "--tensorboard"):
     tensorboard = True
+    if a and a[0] != "-":
+      LOG_DIR = a
   elif o in ("-l", "--model_loc"):
+    if model_dir is not None:
+      print("using predetermined model list")
+      continue
     model_dir = a
     one_model = True
   elif o in ("-m", "--hashing_methods"):
     hashing_methods = [i for i in a.split(",") if (i == "one_rest" or 
       i == "random")]
+  elif o in ("-b", "--batch_norm"):
+    batch_norm = True
+  elif o in ("-n", "--new_support_set"):
+    new_set = True
   else:
     print("unhandled option "+o)
     help_message()
 
-if not model_dir:
-  print("no list of models provided")
+if model_dir is None:
+  print("no list of models or single provided, use -l or -d flags")
+  exit(1)
+
+train_images, train_labels, test_images, test_labels = get_images()
 
 def create_network(img, size, First = False):
   currInp = img
@@ -151,17 +198,47 @@ def create_network(img, size, First = False):
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
-        padding= "SAME")
-      convR = tf.add(convR, bias)
-      reluR = tf.nn.relu(convR)
+      if batch_norm:
+        beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))     
+        gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))     
+        mean, variance = tf.nn.moments(convR, [0,1,2])
+        PostNormalized = tf.nn.batch_normalization(convR,mean,variance,beta,gamma,1e-10)
+        reluR = tf.nn.relu(PostNormalized)
+      else:
+        bias = tf.get_variable('bias', [k], initializer = 
+          tf.constant_initializer(0.0))
+        convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
+          padding= "SAME")
+        convR = tf.add(convR, bias)
+        reluR = tf.nn.relu(convR)
       poolR = tf.nn.max_pool(reluR, ksize=[1,2,2,1], strides=[1,2,2,1], 
         padding="SAME")
       currInp = poolR
   
   return currInp
+
+def get_support(nClasses, nSuppImgs, sourceVectors, sourceLabels):
+  supp = []
+  supp_labels = []
+  supp_indices = []
+  while len(supp) < nClasses * nSuppImgs:
+    supp_index = random.randint(0, len(sourceLabels) - 1)
+    choice = sourceLabels[supp_index]
+    while choice in supp_labels:
+      supp_index = random.randint(0, len(sourceLabels) - 1)
+      choice = sourceLabels[supp_index]
+    n = 0
+    change = 1
+    while n < nSuppImgs:
+      while sourceLabels[supp_index] != choice:
+        supp_index += 1
+        if supp_index == len(sourceLabels):
+          supp_index = 0
+      n += 1
+      supp.append(sourceVectors[supp_index])
+      supp_labels.append(sourceLabels[supp_index])
+      supp_indices.append(supp_index)
+  return supp, supp_labels, supp_indices
 
 def cos_similarities(supports, query):
   with tf.name_scope("cosine_distance"):
@@ -248,9 +325,14 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
 file_objs = {}
 for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "../../../data/csv/omniglot_"+model_style+"_lsh_"+method+".csv"
-    print(data_file_name)
-    file_objs[data_file_name] = open(data_file_name, 'a')#'w')
+    data_file_name = "/data/csv/omniglot_"
+    if batch_norm:
+      data_file_name += "normalization_"
+    data_file_name += model_style+"_lsh_"+method+".csv"
+    if file_write and file_write_path:
+      file_objs[data_file_name] = open(file_write_path + data_file_name, 'w')
+    elif file_write:
+      file_objs[data_file_name] = open(base_path + data_file_name, 'w')
     first_line = "method,model_classes,model_supports,"
     if model_style == "one_rest":
       first_line += "model_period,"
@@ -260,7 +342,8 @@ for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
     if method == "random":
       first_line += "testing_planes,"
     first_line += "unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
-    file_objs[data_file_name].write(first_line + "\n")
+    if file_write:
+      file_objs[data_file_name].write(first_line + "\n")
 
 if one_model:
   model_list = ["one"]
@@ -438,34 +521,26 @@ for category in model_list:
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
 
+                if not new_set:
+                  supp, supp_labels, supp_indices = 
+                        get_support(nClasses, nSuppImgs, sourceVectors, sourceLabels)
+
+                  if method == "one_rest":
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
+                    lsh_planes = np.transpose(lsh_planes)
+
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
 
                   for i in range(nTrials):
-                    supp = []
-                    supp_labels = []
-                    supp_indices = []
-                    while len(supp) < nClasses * nSuppImgs:
-                      supp_index = random.randint(0, len(sourceLabels) - 1)
-                      choice = sourceLabels[supp_index]
-                      while choice in supp_labels:
-                        supp_index = random.randint(0, len(sourceLabels) - 1)
-                        choice = sourceLabels[supp_index]
-                      n = 0
-                      change = 1
-                      while n < nSuppImgs:
-                        while sourceLabels[supp_index] != choice:
-                          supp_index += 1
-                          if supp_index == len(sourceLabels):
-                            supp_index = 0
-                        n += 1
-                        supp.append(sourceVectors[supp_index])
-                        supp_labels.append(sourceLabels[supp_index])
-                        supp_indices.append(supp_index)
+                  
+                    if new_set:
+                      supp, supp_labels, supp_indices = 
+                        get_support(nClasses, nSuppImgs, sourceVectors, sourceLabels)
 
-                    if method == "one_rest":
-                      lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
-                      lsh_planes = np.transpose(lsh_planes)
+                      if method == "one_rest":
+                        lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
+                        lsh_planes = np.transpose(lsh_planes)
                     # choose random query
                     query_value = random.choice(supp_labels)
                     query_index = random.randint(0, len(sourceLabels) - 1)
@@ -515,14 +590,17 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "../../../data/csv/omniglot_"+model_style+"_lsh_"+method+".csv"
+                output_file = "/data/csv/omniglot_"
+                if batch_norm:
+                  output_file += "normalization_"
+                output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 for i in reference_dict:
                   output += i[1] + ","
                 output += str(nClasses)+","+str(nSuppImgs)+","
                 if method == "random":
                   output+=str(nPlanes)+","
-                if integer_change:
+                if integer_change and method == "random":
                   output += str(integer_range)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
                 print(output)

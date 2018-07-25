@@ -190,10 +190,13 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
     
     lsh_offset_vals.append(clf.intercept_[0])
 
-  return lsh_matrix, lsh_offset_vals
+  return np.transpose(lsh_matrix), lsh_offset_vals
 
 def gen_lsh_random_planes(num_planes, feature_vectors, labels):
-  return np.transpose((np.matlib.rand(feature_vectors.shape[-1], num_planes) - 0.5) * 2), np.zeros(num_planes)
+  return (np.matlib.rand(feature_vectors.shape[-1], num_planes) - 0.5) * 2, np.zeros(num_planes)
+
+def gen_lsh_random_int_planes(num_planes, feature_vectors, labels):
+  return np.random.randint(-100, 100, size =(feature_vectors.shape[-1], num_planes)), np.zeros(num_planes)
 
 def lsh_true_hash(lsh_bin):
   with tf.name_scope("true_lsh_hashing"):
@@ -381,16 +384,20 @@ for category in model_list:
                   #with tf.name_scope("true_lsh_distance"):
                 dist = tf.equal(supp_true, lsh_bin)
                 true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
+
+                cheb_distance = tf.cast(tf.not_equal(supp_true, lsh_bin), tf.int32)
+                cheb_lsh_distance = tf.reduce_max(cheb_distance, axis = 1)
                 #with tf.name_scope("sigmoid_lsh"):
                   #with tf.name_scope("sigmoid_lsh_distance"):
                 dist_2 = tf.multiply(supp_sig, lsh_vector)
-                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-1.0, dist_2))))
                 sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
                 
                 sumEff = 0
                 cos_acc = 0
                 lsh_acc = 0
                 lsh_acc2 = 0
+                lsh_cheb_acc = 0
                 # choose random support vectors
                 if unseen:
                   sourceVectors = queryFeatureVectors
@@ -421,13 +428,13 @@ for category in model_list:
                     supp_indices.append(supp_index)
 
                 if method == "random":
-                  lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
+                  lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
                 elif method == "one_rest":
-                  lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
 
-                lsh_planes = np.transpose(lsh_planes)
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
+
                   for i in range(nTrials):
                     # choose random query
                     query_value = random.choice(supp_labels)
@@ -439,13 +446,14 @@ for category in model_list:
                     query = sourceVectors[query_index]
                     query_label = sourceLabels[query_index]
 
+                    #lsh_planes = np.transpose(lsh_planes)
                     if i == 1:
                       writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
                       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
                       run_metadata = tf.RunMetadata()
-                      cosDistances, distancesTrue, distancesSig = session.run(
+                      cosDistances, distancesTrue, distancesSig, distancesCheb = session.run(
                       [cosine_distances, true_lsh_distances, #true_lsh_distances_equal,
-                      sigmoid_lsh_distances], feed_dict = {
+                      sigmoid_lsh_distances, cheb_lsh_distance], feed_dict = {
                       query_vector: [query],
                       support_vectors: supp,
                       lsh_planes_tf: lsh_planes,
@@ -453,9 +461,9 @@ for category in model_list:
                       }, options = runOptions, run_metadata=run_metadata)
                       writer.add_run_metadata(run_metadata, 'step%d' % i)
                     else:
-                      cosDistances, distancesTrue, distancesSig = session.run(
+                      cosDistances, distancesTrue, distancesSig, distancesCheb = session.run(
                       [cosine_distances, true_lsh_distances, #true_lsh_distances_equal,
-                      sigmoid_lsh_distances], feed_dict = {
+                      sigmoid_lsh_distances, cheb_lsh_distance], feed_dict = {
                       query_vector: [query],
                       support_vectors: supp,
                       lsh_planes_tf: lsh_planes,
@@ -464,6 +472,7 @@ for category in model_list:
 
                     LSHMatchTrue = supp_labels[np.argmax(distancesTrue)]
                     LSHMatchSig = supp_labels[np.argmax(distancesSig)]
+                    LSHMatchCheb = supp_labels[np.argmin(distancesCheb)]
                     cosMatch = supp_labels[np.argmax(cosDistances)]
                  
                     if cosMatch == query_label:
@@ -472,20 +481,24 @@ for category in model_list:
                     if LSHMatchTrue == query_label:
                       lsh_acc+=1
 
+                    if LSHMatchCheb == query_label:
+                      lsh_cheb_acc+=1
+
                     if LSHMatchSig == query_label:
                       lsh_acc2+=1   
 
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "../../../data/csv/omniglot_"+model_style+"_lsh_"+method+".csv"
+                calc_lsh_cheb = float(lsh_cheb_acc)/(nTrials)
+                output_file = "../../../data/csv/omniglot_normalization_"+model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 for i in reference_dict:
                   output += i[1] + ","
                 output += str(nClasses)+","+str(nSuppImgs)+","
                 if method == "random":
                   output+=str(nPlanes)+","
-                output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
+                output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_cheb) + "," + str(calc_lsh_acc2)
                 print(output)
                 #file_objs[output_file].write(output + "\n")
         if method == "one_rest":
