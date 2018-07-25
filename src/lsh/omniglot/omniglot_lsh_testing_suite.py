@@ -131,7 +131,7 @@ def help_message():
   print("-m,--hashing_methods:    list of hashing methods to use")
   print("-i,--num_iterations:     number of test iterations")
   print("-n,--new_support_set:    get new support set for each trial")
-  print("-v,--verbose:            get results printed to console")
+  print("-v,--non_verbose:        no results printed to console")
   print("")
   exit(1)
 
