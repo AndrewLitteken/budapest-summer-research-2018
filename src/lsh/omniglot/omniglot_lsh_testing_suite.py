@@ -4,6 +4,10 @@ import os
 
 os.environ["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"] + ":/afs/crc.nd.edu/x86_64_linux/c/cuda/8.0/extras/CUPTI/lib64/"
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
 from skimage import transform, io
 from sklearn import svm
 import tensorflow as tf
@@ -106,6 +110,7 @@ integer_range_list = [1000]
 integer_change = False
 new_set = False
 batch_norm = False
+verbose = True
 
 def help_message():
   print("Testing Suite LSH Hashing for variable number of items\n")
@@ -126,14 +131,15 @@ def help_message():
   print("-m,--hashing_methods:    list of hashing methods to use")
   print("-i,--num_iterations:     number of test iterations")
   print("-n,--new_support_set:    get new support set for each trial")
+  print("-v,--verbose:            get results printed to console")
   print("")
   exit(1)
 
-opts, args = getopt.getopt(sys.argv[1:], "hbvf:t:c:r:s:p:u:d:i:m:l:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnbvtf:c:r:s:p:u:d:i:m:l:", ["help", 
   "batch_norm","new_support_set","num_classes_list=", "num_supports_list=", 
   "num_iterations=","num_planes_list=","unseen_list=","model_dir=",
   "hashing_methods=","model_loc=","integer_range=","tensorboard=",
-  "file_write="])
+  "file_write=","no_verbose","tensorboard"])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
@@ -177,11 +183,11 @@ for o, a in opts:
     batch_norm = True
   elif o in ("-n", "--new_support_set"):
     new_set = True
+  elif o in ("-v", "--non_verbose"):
+    verbose = False
   else:
     print("unhandled option "+o)
     help_message()
-
-print(unseen_list)
 
 if not model_dir:
   print("no list of models provided")
@@ -199,6 +205,8 @@ def create_network(img, size, First = False):
       layer += 1
       weight = tf.get_variable('weight', [3,3,currFilt,k])
       currFilt = k
+      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
+        padding= "SAME")
       if batch_norm:
         beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))     
         gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))     
@@ -208,8 +216,6 @@ def create_network(img, size, First = False):
       else:
         bias = tf.get_variable('bias', [k], initializer = 
           tf.constant_initializer(0.0))
-        convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
-          padding= "SAME")
         convR = tf.add(convR, bias)
         reluR = tf.nn.relu(convR)
       poolR = tf.nn.max_pool(reluR, ksize=[1,2,2,1], strides=[1,2,2,1], 
@@ -296,7 +302,7 @@ def true_lsh_dist_equal(lshSupp, lsh_bin):
 def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
   with tf.name_scope("sigmoid_lsh_distance"):
     dist_2 = tf.multiply(lshVecSupp, lshVecQuery)
-    dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+    dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-1.0, dist_2))))
     dist2 = tf.reduce_sum(dist2, [1])  # check this!
     return dist2
 
@@ -566,7 +572,10 @@ for category in model_list:
                     query_label = sourceLabels[query_index]
 
                     if i == 1 and tensorboard:
-                      writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
+                      batching = "non_batch/"
+                      if batch_norm:
+                        batching = "batch/"
+                      writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + batching + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
                       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
                       run_metadata = tf.RunMetadata()
                       cosDistances, distancesTrue, distancesSig = session.run(
@@ -614,10 +623,10 @@ for category in model_list:
                 output += str(nClasses)+","+str(nSuppImgs)+","
                 if method == "random":
                   output+=str(nPlanes)+","
-                if integer_change and method == "random":
                   output += str(integer_range)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
-                print(output)
+                if verbose:
+                  print(output)
                 if file_write:
                   file_objs[output_file].write(output + "\n")
         if method == "one_rest":
