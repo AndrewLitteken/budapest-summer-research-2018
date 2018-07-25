@@ -1,5 +1,9 @@
 # Checking viability of LSH with random planes Omniglot
 
+import os
+
+os.environ["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"] + ":/afs/crc.nd.edu/x86_64_linux/c/cuda/8.0/extras/CUPTI/lib64/"
+
 from skimage import transform, io
 from sklearn import svm
 import tensorflow as tf
@@ -9,14 +13,9 @@ import getopt
 import random
 import math
 import sys
-import os
 
 train_file_path = "../../../testing-data/omniglot/"
-LOG_DIR = "/tmp/omniglot_batch_testing"
-
-# Hardware Specifications
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+LOG_DIR = "./omniglot_testing"
 
 def make_dir_list(data_dir):
   path_train = "{}images_background/".format(data_dir)
@@ -97,14 +96,23 @@ hashing_methods=["random", "one_rest"]
 unseen_list = [False]
 model_dir = None
 one_model = False
+file_write = False
+tensorboard = True
+integer_range_list = [1000]
+integer_change = False
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:i:s:p:a:u:d:m:l:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hftc:r:v:s:p:a:u:d:m:l:", ["help", 
   "num_classes_list=", "num_supports_list=", "num_iterations=",
-  "num_planes_list=","unseen_list=","model_dir=", "hashing_methods=","model_loc="])
+  "num_planes_list=","unseen_list=","model_dir=", "hashing_methods=","model_loc=","--integer_range="])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
     nClasses_list = [int(i) for i in a.split(",")]
+  elif o in ("-f", "--file_write"):
+    file_write = True
+  elif o in ("--integer_range", "-r"):
+    integer_range_list = [int(i) for i in a.split(",")]
+    integer_change = True
   elif o in ("-s", "--num_supports"):
     nSuppImgs_list = [int(i) for i in a.split(",")]
   elif o in ("-p", "--num_planes"):
@@ -117,6 +125,8 @@ for o, a in opts:
     unseen_list = [True for i in a.split(",") if i == "True"]
   elif o in ("-d", "--model_dir"):
     model_dir = a
+  elif o in ("-t", "--tensorboard"):
+    tensorboard = True
   elif o in ("-l", "--model_loc"):
     model_dir = a
     one_model = True
@@ -195,6 +205,9 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
 def gen_lsh_random_planes(num_planes, feature_vectors, labels):
   return np.transpose((np.matlib.rand(feature_vectors.shape[-1], num_planes) - 0.5) * 2), np.zeros(num_planes)
 
+def gen_lsh_random_int_planes(num_planes, feature_vectors, labels):
+  return np.random.randint(-integer_range, integer_range, size = (feature_vectors.shape[-1], num_planes)), np.zeros(num_planes)
+
 def lsh_true_hash(lsh_bin):
   with tf.name_scope("true_lsh_hashing"):
     lsh_bin = tf.sign(lsh_bin, name = "bin_signs")
@@ -235,8 +248,9 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
 file_objs = {}
 for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "../../../data/csv/omniglot_normalization_"+model_style+"_lsh_"+method+".csv"
-    file_objs[data_file_name] = open(data_file_name, 'w')
+    data_file_name = "../../../data/csv/omniglot_"+model_style+"_lsh_"+method+".csv"
+    print(data_file_name)
+    file_objs[data_file_name] = open(data_file_name, 'a')#'w')
     first_line = "method,model_classes,model_supports,"
     if model_style == "one_rest":
       first_line += "model_period,"
@@ -348,7 +362,8 @@ for category in model_list:
           if method == "one_rest":
             nPlanes = nClasses
           for unseen in unseen_list:
-              for nSuppImgs in nSuppImgs_list:
+            for nSuppImgs in nSuppImgs_list:
+              for integer_range in integer_range_list:  
                 tf.reset_default_graph()
 
                 nSupp = nClasses * nSuppImgs
@@ -421,9 +436,8 @@ for category in model_list:
                     supp_indices.append(supp_index)
 
                 if method == "random":
-                  lsh_planes, lsh_offset_vals = gen_lsh_random_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
+                  lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
 
-                lsh_planes = np.transpose(lsh_planes)
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
 
@@ -462,7 +476,7 @@ for category in model_list:
                     query = sourceVectors[query_index]
                     query_label = sourceLabels[query_index]
 
-                    if i == 1:
+                    if i == 1 and tensorboard:
                       writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
                       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
                       run_metadata = tf.RunMetadata()
@@ -508,9 +522,12 @@ for category in model_list:
                 output += str(nClasses)+","+str(nSuppImgs)+","
                 if method == "random":
                   output+=str(nPlanes)+","
+                if integer_change:
+                  output += str(integer_range)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
                 print(output)
-                #file_objs[output_file].write(output + "\n")
+                if file_write:
+                  file_objs[output_file].write(output + "\n")
         if method == "one_rest":
           break
 

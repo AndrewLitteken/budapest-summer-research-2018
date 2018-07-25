@@ -1,4 +1,4 @@
-# Checking viability of LSH with random planes Omniglot
+#  Checking viability of LSH with random planes Omniglot
 
 from skimage import transform, io
 from sklearn import svm
@@ -12,11 +12,9 @@ import sys
 import os
 
 train_file_path = "../../../testing-data/omniglot/"
-LOG_DIR = "/tmp/omniglot_batch_testing"
+LOG_DIR = "./omniglot_batch_testing"
 
-# Hardware Specifications
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+print(tf.__version__)
 
 def make_dir_list(data_dir):
   path_train = "{}images_background/".format(data_dir)
@@ -36,7 +34,7 @@ def make_dir_list(data_dir):
 
   return np.asarray(train_dirs), np.asarray(test_dirs)
 
-# Graph Constants
+#  Graph Constants
 size = [28, 28, 1]
 nKernels = [64, 64, 64]
 fully_connected_nodes = 128
@@ -62,7 +60,6 @@ def get_images():
   for i in list_range:
     train_images.append(raw_train_images[i])
     train_labels.append(raw_train_labels[i])
-
   raw_test_images = []
   raw_test_labels = []
   for char_dir in test_image_list:
@@ -84,7 +81,7 @@ def get_images():
   return train_images, train_labels, test_images, test_labels
 
 train_images, train_labels, test_images, test_labels = get_images()
-# LSH Testing
+#  LSH Testing
 batchS = 32
 nPlanes_list = [500] 
 
@@ -174,16 +171,16 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
     x = []
     y = []
     for index in range(len(feature_vectors)):
-      # print(np.asarray(feature_vectors[index]).shape)
+      #  print(np.asarray(feature_vectors[index]).shape)
       x.append(feature_vectors[index])
       
-      # create a vector y which classifies each vector as "i" or "not i"
+      #  create a vector y which classifies each vector as "i" or "not i"
       if labels[index] == i:
         y.append(1)
       else:
         y.append(0)
         
-    # Decrease C if the data turns out (very) noisy
+      #Decrease C if the data turns out (very) noisy
     clf = svm.SVC(kernel='linear', C = 1.0)
     clf.fit(x,y)
       
@@ -212,7 +209,7 @@ def lsh_sig_hash(feature_vectors, LSH_matrix, lsh_offset_vals):
     lsh_vectors = tf.add(lsh_vectors, lsh_offset_vals, name = "offset_addition")
     return lsh_vectors
 
-  # Generate distance
+# Generate distance
 def true_lsh_dist(lshSupp, lshQueryO):
   with tf.name_scope("true_lsh_distance"):
     dist = tf.logical_not(tf.logical_xor(lshSupp, lshQueryO))
@@ -233,11 +230,11 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
   with tf.name_scope("sigmoid_lsh_distance"):
     dist_2 = tf.multiply(lshVecSupp, lshVecQuery)
     dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
-    dist2 = tf.reduce_sum(dist2, [1])  # check this!
+    dist2 = tf.reduce_sum(dist2, [1])    # check this!
     return dist2
 
 file_objs = {}
-for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
+for model_style in ["cosine"]: #, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
     data_file_name = "../../../data/csv/omniglot_normalization_"+model_style+"_lsh_"+method+".csv"
     file_objs[data_file_name] = open(data_file_name, 'w')
@@ -305,7 +302,7 @@ for category in model_list:
     
     tf.reset_default_graph()
 
-    # Query Information - Vector of images
+    #  Query Information - Vector of images
     dataset = tf.placeholder(tf.float32, [None]+size)
 
     features = create_network(dataset, size)
@@ -330,7 +327,8 @@ for category in model_list:
           featureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
             FEAT.shape[3], FEAT.shape[4]])
         featureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
-      featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
+      featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))
+  
 
       queryDataset = test_images
       queryLabels = test_labels
@@ -357,7 +355,7 @@ for category in model_list:
 
                 nSupp = nClasses * nSuppImgs
                 with tf.name_scope("support_setup"):
-                  support_vectors = tf.placeholder(tf.float32, [nSupp, featureVectors.shape[1]], name = "support_feature_vectors")
+                  support_vectors = tf.placeholder(tf.float32, [nSupp, queryFeatureVectors.shape[1]], name = "support_feature_vectors")
                   lsh_planes_tf = tf.placeholder(tf.float32, [queryFeatureVectors.shape[1], nPlanes], name = "lsh_planes")
                   lsh_offsets_tf = tf.placeholder(tf.float32, [nPlanes], name = "lsh_offsets")
 
@@ -366,40 +364,40 @@ for category in model_list:
 
                 query_vector = tf.placeholder(tf.float32, [1, queryFeatureVectors.shape[1]], name = "query_feature_vector")
                 summary = tf.summary.merge_all()
-                #with tf.name_scope("cosine"):
-                #  with tf.name_scope("cosine_distance"):
+#                with tf.name_scope("cosine"):
+#                  with tf.name_scope("cosine_distance"):
                 dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
                 supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
                 cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
                   
-                #with tf.name_scope("true_lsh"):
-                #  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf, "")
-                #  true_lsh_distances = true_lsh_dist(supp_true, query_true)
-                #with tf.name_scope("first_hash"):
+#                with tf.name_scope("true_lsh"):
+#                  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf, "")
+#                  true_lsh_distances = true_lsh_dist(supp_true, query_true)
+#                with tf.name_scope("first_hash"):
                 lsh_vector = lsh_sig_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
-                #with tf.name_scope("true_lsh_equal"):
-                  #with tf.name_scope("true_lsh_hashing"):
+#                with tf.name_scope("true_lsh_equal"):
+#                  with tf.name_scope("true_lsh_hashing"):
                 lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
                 lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
                 lsh_bin = tf.cast(lsh_bin, bool)
-                  #with tf.name_scope("true_lsh_distance"):
+#                  with tf.name_scope("true_lsh_distance"):
                 dist = tf.equal(supp_true, lsh_bin)
                 true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
 
                 cheb_distance = tf.cast(tf.not_equal(supp_true, lsh_bin), tf.int32)
                 cheb_lsh_distance = tf.reduce_max(cheb_distance, axis = 1)
-                #with tf.name_scope("sigmoid_lsh"):
-                  #with tf.name_scope("sigmoid_lsh_distance"):
+#                with tf.name_scope("sigmoid_lsh"):
+#                  with tf.name_scope("sigmoid_lsh_distance"):
                 dist_2 = tf.multiply(supp_sig, lsh_vector)
                 dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-1.0, dist_2))))
-                sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
+                sigmoid_lsh_distances = tf.reduce_sum(dist2, [1]) # check this!
                 
                 sumEff = 0
                 cos_acc = 0
                 lsh_acc = 0
                 lsh_acc2 = 0
                 lsh_cheb_acc = 0
-                # choose random support vectors
+                #  choose random support vectors
                 if unseen:
                   sourceVectors = queryFeatureVectors
                   sourceLabels = queryLabels
@@ -429,11 +427,11 @@ for category in model_list:
                     supp_indices.append(supp_index)
 
                 if method == "random":
-                  lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
+                  lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, sourceVectors[:nSupportTraining], sourceLabels)
 
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
-
+                   
                   for i in range(nTrials):
                     supp = []
                     supp_labels = []
@@ -458,7 +456,7 @@ for category in model_list:
 
                     if method == "one_rest":
                       lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
-                    # choose random query
+                    #  choose random query
                     query_value = random.choice(supp_labels)
                     query_index = random.randint(0, len(sourceLabels) - 1)
                     while query_value != sourceLabels[query_index] or query_index in supp_indices:
@@ -468,13 +466,13 @@ for category in model_list:
                     query = sourceVectors[query_index]
                     query_label = sourceLabels[query_index]
 
-                    #lsh_planes = np.transpose(lsh_planes)
+#                    lsh_planes = np.transpose(lsh_planes)
                     if i == 1:
                       writer = tf.summary.FileWriter(LOG_DIR + "/" + model_style + "/" + method + "/" + str(nPlanes) + "/" + str(nClasses) +"/" + str(nSuppImgs) + "/" + str(i), session.graph)
                       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
                       run_metadata = tf.RunMetadata()
                       cosDistances, distancesTrue, distancesSig, distancesCheb = session.run(
-                      [cosine_distances, true_lsh_distances, #true_lsh_distances_equal,
+                      [cosine_distances, true_lsh_distances,
                       sigmoid_lsh_distances, cheb_lsh_distance], feed_dict = {
                       query_vector: [query],
                       support_vectors: supp,
@@ -484,7 +482,7 @@ for category in model_list:
                       writer.add_run_metadata(run_metadata, 'step%d' % i)
                     else:
                       cosDistances, distancesTrue, distancesSig, distancesCheb = session.run(
-                      [cosine_distances, true_lsh_distances, #true_lsh_distances_equal,
+                      [cosine_distances, true_lsh_distances,
                       sigmoid_lsh_distances, cheb_lsh_distance], feed_dict = {
                       query_vector: [query],
                       support_vectors: supp,
@@ -522,7 +520,7 @@ for category in model_list:
                   output+=str(nPlanes)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_cheb) + "," + str(calc_lsh_acc2)
                 print(output)
-                #file_objs[output_file].write(output + "\n")
+#                file_objs[output_file].write(output + "\n")
         if method == "one_rest":
           break
 

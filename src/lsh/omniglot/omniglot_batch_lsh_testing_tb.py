@@ -12,7 +12,7 @@ import sys
 import os
 
 train_file_path = "../../../testing-data/omniglot/"
-LOG_DIR = "/tmp/omniglot_batch_testing"
+LOG_DIR = "./omniglot_batch_testing"
 
 # Hardware Specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 

@@ -12,9 +12,6 @@ import os
 
 train_file_path = "../../../testing-data/omniglot/"
 
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
-
 def make_dir_list(data_dir):
   path_train = "{}images_background/".format(data_dir)
   path_test = "{}images_evaluation/".format(data_dir)
@@ -182,11 +179,24 @@ def generate_lsh_planes(features, nPlanes):
 
   return plane, offset
 
+def generate_int_lsh_planes(features, nPlanes):
+  with tf.variable_scope('lshPlanes', reuse=tf.AUTO_REUSE) as varscope:
+    # Generate enough planes of random slopes
+    plane = tf.get_variable('plane', initializer = 
+      (tf.random_uniform([tf.cast(features.shape[1] * features.shape[2] * 
+      features.shape[3], tf.int32), nPlanes], minval = -100, maxval = 100)),
+      trainable=False)
+
+    offset = tf.get_variable('offsets', initializer = tf.zeros([nPlanes], 
+      tf.float32))
+
+  return plane, offset
+
 # Call the network created above on the query
 query_features = create_network(q_img, size, First = True)
 
 # Create the random vlalues
-lsh_planes, lsh_offsets = generate_lsh_planes(query_features, nPlanes)
+lsh_planes, lsh_offsets = generate_int_lsh_planes(query_features, nPlanes)
 
 # Reshape to fit the limits for lsh application
 query_features_shape = tf.reshape(query_features, [query_features.shape[0], 
@@ -308,6 +318,7 @@ with tf.Session() as session:
 
   step = 1
   while step < nIt:
+    print(step)
     step = step + 1
 
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
