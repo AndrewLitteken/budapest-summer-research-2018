@@ -1,5 +1,9 @@
 # Using Random LSH Planes training in a matching network OMNIGLOT
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
 from skimage import transform, io
 import tensorflow as tf
 import numpy as np
@@ -46,16 +50,18 @@ nPlanes = 100
 learning_rate = 1e-5
 
 training = False
+integer_range = 100
 
 # Support and testing infromation
 nClasses = 3
 nImgsSuppClass = 5 
+tensorboard = False
 
 base = "/tmp/omniglot-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "htc:p:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hmtr:c:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "num_planes=", "base_path=", 
-  "num_iterations=", "training"])
+  "num_iterations=", "integer_range=", "training","tensorboard"])
 
 for o, a in opts:
   if o in ("-t", "--training"):
@@ -70,6 +76,10 @@ for o, a in opts:
     nPlanes = int(a)
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-r", "--integer_range"):
+    integer_range = int(a)
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
   elif o in ("-h", "--help"):
     help_message()
   else:
@@ -77,6 +87,7 @@ for o, a in opts:
     help_message()
 
 SAVE_PATH = base + str(training) + "-" + str(nPlanes) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+LOG_DIR = "./omniglot_network_training/lsh_random/" + str(training) + "/" + str(nPlanes) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
 
 train_dirs, test_dirs = make_dir_list(train_file_path)
 
@@ -184,7 +195,7 @@ def generate_int_lsh_planes(features, nPlanes):
     # Generate enough planes of random slopes
     plane = tf.get_variable('plane', initializer = 
       (tf.random_uniform([tf.cast(features.shape[1] * features.shape[2] * 
-      features.shape[3], tf.int32), nPlanes], minval = -100, maxval = 100)),
+      features.shape[3], tf.int32), nPlanes], minval = -integer_range, maxval = integer_range)),
       trainable=False)
 
     offset = tf.get_variable('offsets', initializer = tf.zeros([nPlanes], 
@@ -318,17 +329,27 @@ with tf.Session() as session:
 
   step = 1
   while step < nIt:
-    print(step)
     step = step + 1
 
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
-      ={s_imgs: suppImgs, 
-        q_img: queryImgBatch,
-        q_label: queryLabelBatch,
-       })
+    if tensorboard and step%100 == 0:
+      writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
+      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+      run_metadata = tf.RunMetadata()
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         }, options = runOptions, run_metadata=run_metadata)
+      writer.add_run_metadata(run_metadata, 'step%d' % i)
+    else:
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         })
     
     # Observe Values
     if (step%100) == 0:

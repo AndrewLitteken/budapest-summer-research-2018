@@ -1,5 +1,9 @@
 # Using Cosine Distance to train a matching network omniglot
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
 from skimage import transform, io
 import tensorflow as tf
 import numpy as np
@@ -49,10 +53,11 @@ learning_rate = 1e-4
 # Support and testing infromation
 nClasses = 3
 nImgsSuppClass = 5
+tensorboard = False
 
 base = "/tmp/omniglot-cosine-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hdc:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hmdc:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "base_path=", "num_iterations="])
 
 for o, a in opts:
@@ -66,6 +71,8 @@ for o, a in opts:
     nIt = int(a)
   elif o in ("-d", "--data"):
     train_file_path = "../../../testing-data/omniglot-rotate/"
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
   elif o in ("-h", "--help"):
     help_message()
   else:
@@ -75,6 +82,9 @@ for o, a in opts:
 train_images, test_images = make_dir_list(train_file_path)
 
 SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
+
+LOG_DIR = "./omniglot_network_training/cosine/" + str(nClasses) + "/" + str(nImgsSuppClass) 
+
 
 train_dirs, test_dirs = make_dir_list(train_file_path) 
 
@@ -265,11 +275,22 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
-      ={s_imgs: suppImgs, 
-        q_img: queryImgBatch,
-        q_label: queryLabelBatch,
-       })
+    if tensorboard and step%100 == 0:
+      writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
+      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+      run_metadata = tf.RunMetadata()
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         }, options = runOptions, run_metadata=run_metadata)
+      writer.add_run_metadata(run_metadata, 'step%d' % i)
+    else:
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         })
     
     # Observe Values
     if (step%100) == 0:
