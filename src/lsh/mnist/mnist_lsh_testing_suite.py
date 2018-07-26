@@ -429,24 +429,17 @@ for category in model_list:
                 if not new_set:
                   supp = []
                   supp_labels = []
-                  supp_indices = []
-                  while len(supp) < nClasses * nSuppImgs:
-                    supp_index = random.randint(0, len(sourceLabels) - 1)
-                    choice = sourceLabels[supp_index]
-                    while choice in supp_labels:
-                      supp_index = random.randint(0, len(sourceLabels) - 1)
-                      choice = sourceLabels[supp_index]
-                    n = 0
-                    change = 1
+                  for j in numbers: 
+                    n = 0 
                     while n < nSuppImgs:
-                      while sourceLabels[supp_index] != choice:
+                      supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
+                      while int(np.argmax(mnist.train.labels[supp_index])) != j:
                         supp_index += 1
-                        if supp_index == len(sourceLabels):
-                          supp_index = 0
-                      n += 1
-                      supp.append(sourceVectors[supp_index])
-                      supp_labels.append(sourceLabels[supp_index])
-                      supp_indices.append(supp_index)
+                        if supp_index == len(mnist.train.images):
+                          supp_index = 0 
+                      n += 1   
+                      supp.append(featureVectors[supp_index])
+                      supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
 
                   if method == "one_rest":
                     lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
@@ -460,37 +453,29 @@ for category in model_list:
                     if new_set:
                       supp = []
                       supp_labels = []
-                      supp_indices = []
-                      while len(supp) < nClasses * nSuppImgs:
-                        supp_index = random.randint(0, len(sourceLabels) - 1)
-                        choice = sourceLabels[supp_index]
-                        while choice in supp_labels:
-                          supp_index = random.randint(0, len(sourceLabels) - 1)
-                          choice = sourceLabels[supp_index]
-                        n = 0
-                        change = 1
+                      for j in numbers: 
+                        n = 0 
                         while n < nSuppImgs:
-                          while sourceLabels[supp_index] != choice:
+                          supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
+                          while int(np.argmax(mnist.train.labels[supp_index])) != j:
                             supp_index += 1
-                            if supp_index == len(sourceLabels):
-                              supp_index = 0
-                          n += 1
-                          supp.append(sourceVectors[supp_index])
-                          supp_labels.append(sourceLabels[supp_index])
-                          supp_indices.append(supp_index)
+                            if supp_index == len(mnist.train.images):
+                              supp_index = 0 
+                          n += 1   
+                          supp.append(featureVectors[supp_index])
+                          supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
 
                       if method == "one_rest":
                         lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
                         lsh_planes = np.transpose(lsh_planes)
                     # choose random query
-                    query_value = random.choice(supp_labels)
-                    query_index = random.randint(0, len(sourceLabels) - 1)
-                    while query_value != sourceLabels[query_index] or query_index in supp_indices:
+                    query_index = random.randint(0, mnist.test.images.shape[0] - 1)
+                    while np.argmax(queryLabels[query_index]) not in numbers:
                       query_index += 1
-                      if query_index == len(sourceLabels):
-                        query_index = 0
-                    query = sourceVectors[query_index]
-                    query_label = sourceLabels[query_index]
+                      if query_index == len(mnist.test.images):
+                          query_index = 0
+                    query = queryFeatureVectors[query_index]
+                    query_label = np.argmax(queryLabels[query_index])
 
                     if i == 1 and tensorboard:
                       batching = "non_batch/"
