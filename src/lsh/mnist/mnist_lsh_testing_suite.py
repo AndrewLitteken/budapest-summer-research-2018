@@ -374,9 +374,9 @@ for category in model_list:
             nPlanes = nClasses
           for unseen in unseen_list:
             if unseen:
-                  numbers = classList[10-nClasses:]
-                else:
-                  numbers = classList[:nClasses]
+                numbers = classList[10-nClasses:]
+            else:
+                numbers = classList[:nClasses]
             for nSuppImgs in nSuppImgs_list:
               for integer_range in integer_range_list:  
                 tf.reset_default_graph()
