@@ -1,4 +1,4 @@
-# Checking viability of LSH with random planes Omniglot
+# Checking viability of LSH with random planes MNIST
 
 import os
 
@@ -8,7 +8,6 @@ import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from skimage import transform, io
 from sklearn import svm
 import tensorflow as tf
 import numpy as np
@@ -22,73 +21,18 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 
 split_path = dir_path.split("/")
 base_path = "/".join(split_path[:-3])
-train_file_path = base_path+"/testing-data/omniglot/"
-LOG_DIR = "./omniglot_testing"
+train_file_path = base_path+"/testing-data/MNIST_data/"
+LOG_DIR = "./mnist_testing"
 
-def make_dir_list(data_dir):
-  path_train = "{}images_background/".format(data_dir)
-  path_test = "{}images_evaluation/".format(data_dir)
-
-  train_dirs = []
-  test_dirs = []
-  for alphabet in os.listdir(path_train):
-    if not alphabet.startswith('.') : 
-      for character in os.listdir("{}{}/".format(path_train,alphabet)):
-        train_dirs.append("{}{}/{}".format(path_train, alphabet, character))
-
-  for alphabet in os.listdir(path_test):
-    if not alphabet.startswith('.') : 
-      for character in os.listdir("{}{}/".format(path_test, alphabet)):
-        test_dirs.append("{}{}/{}".format(path_test, alphabet, character))
-
-  return np.asarray(train_dirs), np.asarray(test_dirs)
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets(train_file_path,
+  one_hot=True)
 
 # Graph Constants
 size = [28, 28, 1]
 nKernels = [64, 64, 64]
 fully_connected_nodes = 128
 poolS = 2
-
-def get_images():
-  train_image_list, test_image_list = make_dir_list(train_file_path)
-
-  raw_train_images = []
-  raw_train_labels = []
-  for char_dir in train_image_list:
-    for file_name in os.listdir(char_dir):
-      file_name = char_dir + "/" + file_name
-      picked_image = io.imread(file_name)
-      image_resize = transform.resize(picked_image, size)
-      raw_train_images.append(image_resize)
-      raw_train_labels.append(char_dir)
-
-  train_images = []
-  train_labels = []
-  list_range = np.arange(len(raw_train_images))
-  np.random.shuffle(list_range)
-  for i in list_range:
-    train_images.append(raw_train_images[i])
-    train_labels.append(raw_train_labels[i])
-
-  raw_test_images = []
-  raw_test_labels = []
-  for char_dir in test_image_list:
-    for file_name in os.listdir(char_dir):
-      file_name = char_dir + "/" + file_name
-      picked_image = io.imread(file_name)
-      image_resize = transform.resize(picked_image, size)
-      raw_test_images.append(image_resize)
-      raw_test_labels.append(char_dir)
-  
-  test_images = []
-  test_labels = []
-  list_range = np.arange(len(raw_test_images))
-  np.random.shuffle(list_range)
-  for i in list_range:
-    test_images.append(raw_test_images[i])
-    test_labels.append(raw_test_labels[i])
-
-  return train_images, train_labels, test_images, test_labels
 
 # LSH Testing
 batchS = 32
@@ -141,6 +85,9 @@ opts, args = getopt.getopt(sys.argv[1:], "hnbvtf:c:r:s:p:u:d:i:m:l:", ["help",
   "hashing_methods=","model_loc=","integer_range=","tensorboard=",
   "file_write=","no_verbose","tensorboard"])
 
+classList = [1,2,3,4,5,6,7,8,9,0]
+numbers = []
+
 for o, a in opts:
   if o in ("-c", "--num_classes"):
     nClasses_list = [int(i) for i in a.split(",")]
@@ -192,8 +139,6 @@ for o, a in opts:
 if not model_dir:
   print("no list of models provided")
 
-train_images, train_labels, test_images, test_labels = get_images()
-
 def create_network(img, size, First = False):
   currInp = img
   layer = 0
@@ -231,7 +176,7 @@ def cos_similarities(supports, query):
     cosDist = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
     return cosDist
 
-def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
+def gen_lsh_pick_planes(num_planes, feature_vectors, labels, numbers):
   
   lsh_matrix = []
   lsh_offset_vals = []
@@ -239,8 +184,7 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
   feature_vectors = np.reshape(np.asarray(feature_vectors),
     (len(feature_vectors), -1))
 
-  label_dirs = set(labels)
-  for index_i, i in enumerate(label_dirs):
+  for index_i, i in enumerate(numbers):
     x = []
     y = []
     for index in range(len(feature_vectors)):
@@ -309,7 +253,7 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
 file_objs = {}
 for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "/data/csv/omniglot_"
+    data_file_name = "/data/csv/mnist_"
     if batch_norm:
       data_file_name += "normalization_"
     data_file_name += model_style+"_lsh_"+method+".csv"
@@ -395,8 +339,8 @@ for category in model_list:
       Saver = tf.train.Saver()
       Saver.restore(session, SAVE_PATH)
 
-      rawDataset = train_images
-      rawLabels = train_labels
+      rawDataset = np.reshape(mnist.train.images, [mnist.train.images.shape[0]] + size)
+      rawLabels = mnist.train.labels
 
       featureVectors = None
       for i in range(int(len(rawDataset)/batchS)):
@@ -409,8 +353,8 @@ for category in model_list:
         featureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
       featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
 
-      queryDataset = test_images
-      queryLabels = test_labels
+      queryDataset = np.reshape(mnist.test.images, [mnist.test.images.shape[0]]+size)
+      queryLabels = mnist.test.labels
 
       queryFeatureVectors = None
       for i in range(int(len(queryDataset)/batchS)):
@@ -429,6 +373,10 @@ for category in model_list:
           if method == "one_rest":
             nPlanes = nClasses
           for unseen in unseen_list:
+            if unseen:
+                  numbers = classList[10-nClasses:]
+                else:
+                  numbers = classList[:nClasses]
             for nSuppImgs in nSuppImgs_list:
               for integer_range in integer_range_list:  
                 tf.reset_default_graph()
@@ -446,10 +394,9 @@ for category in model_list:
                 summary = tf.summary.merge_all()
                 #with tf.name_scope("cosine"):
                 #  with tf.name_scope("cosine_distance"):
-                with tf.name_scope("cosine_distance"):
-                  dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
-                  supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
-                  cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
+                dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
+                supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
+                cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
                   
                 #with tf.name_scope("true_lsh"):
                 #  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf, "")
@@ -458,31 +405,23 @@ for category in model_list:
                 lsh_vector = lsh_sig_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
                 #with tf.name_scope("true_lsh_equal"):
                   #with tf.name_scope("true_lsh_hashing"):
-                with tf.name_scope("true_lsh_hashing"):
-                  lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
-                  lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
-                  lsh_bin = tf.cast(lsh_bin, bool)
+                lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
+                lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
+                lsh_bin = tf.cast(lsh_bin, bool)
                   #with tf.name_scope("true_lsh_distance"):
-                  dist = tf.equal(supp_true, lsh_bin)
-                  true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
+                dist = tf.equal(supp_true, lsh_bin)
+                true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
                 #with tf.name_scope("sigmoid_lsh"):
                   #with tf.name_scope("sigmoid_lsh_distance"):
-                with tf.name_scope("sig_lsh_hashing"):
-                  dist_2 = tf.multiply(supp_sig, lsh_vector)
-                  dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
-                  sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
+                dist_2 = tf.multiply(supp_sig, lsh_vector)
+                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+                sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
                 
                 sumEff = 0
                 cos_acc = 0
                 lsh_acc = 0
                 lsh_acc2 = 0
                 # choose random support vectors
-                if unseen:
-                  sourceVectors = queryFeatureVectors
-                  sourceLabels = queryLabels
-                else:
-                  sourceVectors = featureVectors
-                  sourceLabels = rawLabels
 
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
@@ -510,7 +449,7 @@ for category in model_list:
                       supp_indices.append(supp_index)
 
                   if method == "one_rest":
-                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
                     lsh_planes = np.transpose(lsh_planes)
 
                 with tf.Session() as session:
@@ -595,7 +534,7 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "/data/csv/omniglot_"
+                output_file = "/data/csv/mnist_"
                 if batch_norm:
                   output_file += "normalization_"
                 output_file += model_style+"_lsh_"+method+".csv"
