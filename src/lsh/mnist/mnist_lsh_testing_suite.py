@@ -414,7 +414,7 @@ for category in model_list:
                 #with tf.name_scope("sigmoid_lsh"):
                   #with tf.name_scope("sigmoid_lsh_distance"):
                 dist_2 = tf.multiply(supp_sig, lsh_vector)
-                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-1.0, dist_2))))
                 sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
                 
                 sumEff = 0
