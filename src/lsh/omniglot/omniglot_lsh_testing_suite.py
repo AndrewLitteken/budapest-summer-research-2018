@@ -325,7 +325,7 @@ for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
     first_line += "testing_classes,testing_supports,"
     if method == "random":
       first_line += "testing_planes,"
-    first_line += "unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
+    first_line += "integer_range,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc"
     if file_write:
       file_objs[data_file_name].write(first_line + "\n")
 
@@ -605,7 +605,7 @@ for category in model_list:
                 output += str(nClasses)+","+str(nSuppImgs)+","
                 if method == "random":
                   output+=str(nPlanes)+","
-                  output += str(integer_range)+","
+                output += str(integer_range)+","
                 output += str(unseen)+","+str(cos_lsh_acc) + "," + str(calc_lsh_acc) + "," + str(calc_lsh_acc2)
                 if verbose:
                   print(output)
