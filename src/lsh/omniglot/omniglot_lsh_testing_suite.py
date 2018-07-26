@@ -446,9 +446,10 @@ for category in model_list:
                 summary = tf.summary.merge_all()
                 #with tf.name_scope("cosine"):
                 #  with tf.name_scope("cosine_distance"):
-                dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
-                supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
-                cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
+                with tf.name_scope("cosine_distance"):
+                  dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
+                  supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
+                  cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
                   
                 #with tf.name_scope("true_lsh"):
                 #  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf, "")
@@ -457,17 +458,19 @@ for category in model_list:
                 lsh_vector = lsh_sig_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
                 #with tf.name_scope("true_lsh_equal"):
                   #with tf.name_scope("true_lsh_hashing"):
-                lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
-                lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
-                lsh_bin = tf.cast(lsh_bin, bool)
+                with tf.name_scope("true_lsh_hashing"):
+                  lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
+                  lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
+                  lsh_bin = tf.cast(lsh_bin, bool)
                   #with tf.name_scope("true_lsh_distance"):
-                dist = tf.equal(supp_true, lsh_bin)
-                true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
+                  dist = tf.equal(supp_true, lsh_bin)
+                  true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
                 #with tf.name_scope("sigmoid_lsh"):
                   #with tf.name_scope("sigmoid_lsh_distance"):
-                dist_2 = tf.multiply(supp_sig, lsh_vector)
-                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
-                sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
+                with tf.name_scope("sig_lsh_hashing"):
+                  dist_2 = tf.multiply(supp_sig, lsh_vector)
+                  dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+                  sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
                 
                 sumEff = 0
                 cos_acc = 0
