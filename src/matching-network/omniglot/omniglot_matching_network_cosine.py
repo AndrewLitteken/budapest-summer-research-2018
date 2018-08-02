@@ -204,14 +204,14 @@ if batch_norm:
 if dropout:
   SAVE_PATH += "dropout-"
 
-SAVE_PATH += str(len(nKernels) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH += str(len(nKernels)) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
 LOG_DIR = "./omniglot_network_training/cosine/"
 if batch_norm:
   LOG_DIR += "norm/"
 if dropout:
   LOG_DIR += "dropout/"
-LOG_DIR += str(len(nKernels) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
+LOG_DIR += str(len(nKernels)) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
 
 # Session
 

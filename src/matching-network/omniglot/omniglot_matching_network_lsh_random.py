@@ -59,9 +59,10 @@ batch_norm = False
 
 base = "/tmp/omniglot-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hmnodtr:c:p:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hmnodtr:L:c:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "num_planes=", "base_path=", 
-  "num_iterations=", "integer_range=", "training","meta_tensorboard"])
+  "num_iterations=", "integer_range=", "training","meta_tensorboard",
+  "dropout", "batch_norm", "num_layers="])
 
 for o, a in opts:
   if o in ("-t", "--training"):
@@ -86,6 +87,8 @@ for o, a in opts:
     dropout = True
   elif o in ("-n", "--batch_norm"):
     batch_norm = True
+  elif o in ("-L", "--num_layers"):
+  	nKernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):
     help_message()
   else:
@@ -98,14 +101,14 @@ if batch_norm:
 if dropout:
   SAVE_PATH += "dropout-"
 
-SAVE_PATH += str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH += str(len(nKernels)) + "-" + str(training) + "-" + str(nPlanes) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
 LOG_DIR = "./omniglot_network_training/lsh_random/"
 if batch_norm:
   LOG_DIR += "norm/"
 if dropout:
   LOG_DIR += "dropout/"
-LOG_DIR += str(training) + "/" + str(nPlanes) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
+LOG_DIR += str(len(nKernels)) + "/" + str(training) + "/" + str(nPlanes) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
 
 train_images, test_images = make_dir_list(train_file_path)
 

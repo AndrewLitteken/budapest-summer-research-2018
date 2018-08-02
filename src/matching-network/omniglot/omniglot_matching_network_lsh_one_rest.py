@@ -56,7 +56,7 @@ nImgsSuppClass = 5
 
 base = "/tmp/omniglot-lsh-one-all-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:p:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnoLc:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "period_length=", "base_path=", 
   "num_iterations="])
 
@@ -66,20 +66,42 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "omniglot-lsh-one-rest-"
+    base = a
+    if a[-1] == "/":
+      base += "/"
+    base += "omniglot-lsh-one-rest-"
   elif o in ("-p", "--period_length"):
     period = int(a)
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-o", "--dropout"):
+    dropout = True
+  elif o in ("-n", "--batch_norm"):
+    batch_norm = True
+  elif o in ("-L", "--num_layers"):
+    nKernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):
     help_message()
   else:
     print("unhandled option: "+o)
     help_message()
 
-SAVE_PATH = base + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH = base
+if batch_norm:
+  SAVE_PATH += "norm-"
+if dropout:
+  SAVE_PATH += "dropout-"
+
+SAVE_PATH += str(len(nKernels)) + "-" + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
 train_dirs, test_dirs = make_dir_list(train_file_path)
+
+LOG_DIR = "./omniglot_network_training/lsh_one_rest/"
+if batch_norm:
+  LOG_DIR += "norm/"
+if dropout:
+  LOG_DIR += "dropout/"
+LOG_DIR += str(len(nKernels)) + "/" + str(period)+ "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
 
 # Collecting sample both for query and for testing
 def get_samples(data_dir, nSupportImgs):
