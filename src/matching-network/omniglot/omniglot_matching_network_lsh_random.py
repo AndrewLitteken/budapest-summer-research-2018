@@ -34,8 +34,6 @@ def make_dir_list(data_dir):
 
   return np.asarray(train_dirs), np.asarray(test_dirs)
 
-train_images, test_images = make_dir_list(train_file_path)
-
 # Graph Constants
 size = [28, 28, 1]
 nKernels = [64, 64, 64]
@@ -47,21 +45,23 @@ nIt = 5000
 check = 1000
 batchS = 32
 nPlanes = 100
-learning_rate = 1e-5
+learning_rate = 1e-6
 
 training = False
 integer_range = 100
 
 # Support and testing infromation
 nClasses = 3
-nImgsSuppClass = 5 
+nImgsSuppClass = 5
 tensorboard = False
+dropout = False
+batch_norm = False
 
 base = "/tmp/omniglot-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hmtr:c:p:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hmnodtr:c:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "num_planes=", "base_path=", 
-  "num_iterations=", "integer_range=", "training","tensorboard"])
+  "num_iterations=", "integer_range=", "training","meta_tensorboard"])
 
 for o, a in opts:
   if o in ("-t", "--training"):
@@ -80,16 +80,34 @@ for o, a in opts:
     integer_range = int(a)
   elif o in ("-m", "--meta_tensorboard"):
     tensorboard = True
+  elif o in ("-d", "--data_dir"):
+    train_file_path = "../../../testing-data/omniglot-rotate/"
+  elif o in ("-o", "--dropout"):
+    dropout = True
+  elif o in ("-n", "--batch_norm"):
+    batch_norm = True
   elif o in ("-h", "--help"):
     help_message()
   else:
     print("unhandled option: "+o)
     help_message()
 
-SAVE_PATH = base + str(training) + "-" + str(nPlanes) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
-LOG_DIR = "./omniglot_network_training/lsh_random/" + str(training) + "/" + str(nPlanes) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
+SAVE_PATH = base
+if batch_norm:
+  SAVE_PATH += "norm-"
+if dropout:
+  SAVE_PATH += "dropout-"
 
-train_dirs, test_dirs = make_dir_list(train_file_path)
+SAVE_PATH += str(nClasses) + "-" + str(nImgsSuppClass)
+
+LOG_DIR = "./omniglot_network_training/lsh_random/"
+if batch_norm:
+  LOG_DIR += "norm/"
+if dropout:
+  LOG_DIR += "dropout/"
+LOG_DIR += str(training) + "/" + str(nPlanes) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
+
+train_images, test_images = make_dir_list(train_file_path)
 
 # Collecting sample both for query and for testing
 def get_samples(data_dir, nSupportImgs):
@@ -158,24 +176,33 @@ def create_network(img, size, First = False):
   currInp = img
   layer = 0
   currFilt = size[2]
+  with tf.name_scope("run_network"):
+    for k in nKernels:
+      with tf.variable_scope('conv'+str(layer), 
+        reuse=tf.AUTO_REUSE) as varscope, tf.name_scope('conv'+str(layer)):
+        layer += 1
+        weight = tf.get_variable('weight', [3,3,currFilt,k])
+        currFilt = k
+        if batch_norm:
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))
+          gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))
+          mean, variance = tf.nn.moments(convR, [0,1,2])
+          PostNormalized = tf.nn.batch_normalization(convR,mean,variance,beta,gamma,1e-10)
+          reluR = tf.nn.relu(PostNormalized)
+        else:
+          bias = tf.get_variable('bias', [k], initializer = 
+            tf.constant_initializer(0.0))
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          convR = tf.add(convR, bias)
+          reluR = tf.nn.relu(convR)
+        poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1], 
+          strides=[1,poolS,poolS,1], padding="SAME")
+        currInp = poolR
 
-  for k in nKernels:
-    with tf.variable_scope('conv'+str(layer),
-      reuse=tf.AUTO_REUSE) as varscope:
-      layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])
-      currFilt = k
-      bias = tf.get_variable('bias', [k], initializer =
-        tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
-        padding="SAME")
-      convR = tf.add(convR, bias)
-      reluR = tf.nn.relu(convR)
-      poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1],
-        strides=[1,poolS,poolS,1], padding="SAME")
-      currInp = poolR
-
-  return currInp
+    if dropout:
+      currInp = tf.nn.dropout(currInp,0.8); 
+    return currInp
 
 def generate_lsh_planes(features, nPlanes):
   with tf.variable_scope('lshPlanes', reuse=tf.AUTO_REUSE) as varscope:
@@ -186,7 +213,7 @@ def generate_lsh_planes(features, nPlanes):
       tf.constant(0.5)), tf.constant(2.0)), trainable=training)
 
     offset = tf.get_variable('offsets', initializer = tf.zeros([nPlanes], 
-      tf.float32))
+      tf.float32), trainable = False)
 
   return plane, offset
 
@@ -196,10 +223,10 @@ def generate_int_lsh_planes(features, nPlanes):
     plane = tf.get_variable('plane', initializer = 
       (tf.random_uniform([tf.cast(features.shape[1] * features.shape[2] * 
       features.shape[3], tf.int32), nPlanes], minval = -integer_range, maxval = integer_range)),
-      trainable=False)
+      trainable=training)
 
     offset = tf.get_variable('offsets', initializer = tf.zeros([nPlanes], 
-      tf.float32))
+      tf.float32), trainable = False)
 
   return plane, offset
 
@@ -209,46 +236,47 @@ query_features = create_network(q_img, size, First = True)
 # Create the random vlalues
 lsh_planes, lsh_offsets = generate_int_lsh_planes(query_features, nPlanes)
 
-# Reshape to fit the limits for lsh application
-query_features_shape = tf.reshape(query_features, [query_features.shape[0], 
-  query_features.shape[1] * query_features.shape[2] * 
-  query_features.shape[3]])
+with tf.name_scope("organization_and_multiplication"):
+  # Reshape to fit the limits for lsh application
+  query_features_shape = tf.reshape(query_features, [query_features.shape[0], 
+    query_features.shape[1] * query_features.shape[2] * 
+    query_features.shape[3]])
 
-# Apply the lsh planes
-query_lsh = tf.matmul(query_features_shape, lsh_planes)
+  # Apply the lsh planes
+  query_lsh = tf.matmul(query_features_shape, lsh_planes)
 
-support_list = []
-query_list = []
+  support_list = []
+  query_list = []
 
-# Go through each class and each support image in that class
-for k in range(nClasses):
-  slist=[]
-  qlist=[]
-  for i in range(nImgsSuppClass):
-    support_result = create_network(s_imgs[:, k, i, :, :, :], size)
-    # Fit the results to match the supports matrix multiplication
-    support_shaped = tf.reshape(support_result, [support_result.shape[0],
-      support_result.shape[1] * support_result.shape[2] * 
-      support_result.shape[3]])
+  # Go through each class and each support image in that class
+  for k in range(nClasses):
+    slist=[]
+    qlist=[]
+    for i in range(nImgsSuppClass):
+      support_result = create_network(s_imgs[:, k, i, :, :, :], size)
+      # Fit the results to match the supports matrix multiplication
+      support_shaped = tf.reshape(support_result, [support_result.shape[0],
+        support_result.shape[1] * support_result.shape[2] * 
+        support_result.shape[3]])
 
-    # Apply the LSH Values
-    support_lsh = tf.matmul(support_shaped, lsh_planes)
-    support_lsh = tf.subtract(support_lsh, lsh_offsets)
+      # Apply the LSH Values
+      support_lsh = tf.matmul(support_shaped, lsh_planes)
+      support_lsh = tf.subtract(support_lsh, lsh_offsets)
 
-    # This must be done so that we have a simple way to compare all supports
-    # to one query
-    slist.append(support_lsh)
-    qlist.append(query_lsh)
+      # This must be done so that we have a simple way to compare all supports
+      # to one query
+      slist.append(support_lsh)
+      qlist.append(query_lsh)
 
-  # Create tensorflow stack  
-  slist = tf.stack(slist)
-  qlist = tf.stack(qlist)
-  support_list.append(slist)
-  query_list.append(qlist)
+    # Create tensorflow stack  
+    slist = tf.stack(slist)
+    qlist = tf.stack(qlist)
+    support_list.append(slist)
+    query_list.append(qlist)
 
-# Make a stack to compare the query to every support
-query_repeat = tf.stack(query_list)
-supports = tf.stack(support_list)
+  # Make a stack to compare the query to every support
+  query_repeat = tf.stack(query_list)
+  supports = tf.stack(support_list)
 
 # Loss
 # LSH Calculation: multiplication of two vectors, use sigmoid to estimate
@@ -261,14 +289,13 @@ k = -1.0
 with tf.name_scope("loss"):
   # Multiply the query by the supports
   signed = tf.multiply(query_repeat, supports)
-  sigmoid = tf.divide(tf.constant(1.0), tf.clip_by_value(tf.add(
-  tf.constant(1.0), tf.exp(tf.multiply(tf.constant(k), signed))), 
-  1e-10, float("inf")))
+  #sigmoid = tf.divide(tf.constant(1.0), tf.add(tf.constant(1.0), tf.exp(tf.multiply(tf.constant(k), signed))))
+  sigmoid = tf.sigmoid(signed)
 
   # Sum the sigmoid values to ge the similarity
   similarity = tf.reduce_sum(sigmoid, [3])
   similarity = tf.transpose(similarity,[2,0,1])
-
+  
   # Average the similarites among each class
   mean_similarity = tf.reduce_mean(similarity, 2)
   # Find the maximum similarty in each class
@@ -316,8 +343,8 @@ def get_next_batch(test = False):
 
   return suppImgs, suppLabels, queryImgBatch, queryLabelBatch
 
+print(tf.trainable_variables())
 # Session
-
 # Initialize the variables we start with
 init = tf.global_variables_initializer()
 
@@ -334,7 +361,7 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    if tensorboard and step%100 == 0:
+    if tensorboard and step == 2:
       writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
       run_metadata = tf.RunMetadata()
@@ -350,7 +377,7 @@ with tf.Session() as session:
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
          })
-    
+
     # Observe Values
     if (step%100) == 0:
       print("ITER: "+str(step))

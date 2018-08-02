@@ -186,6 +186,7 @@ query_list = []
 
 support_features = []
 
+with tf.name_scope("organization_multiplication"):
 # Iterate through each class and each support image in that class
 for k in range(nClasses):
   slist=[]
