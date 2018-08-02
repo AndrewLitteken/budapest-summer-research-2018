@@ -17,17 +17,14 @@ train_file_path = "../../../testing-data/cifar-100/train"
 train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
 with open(train_file_path, 'rb') as cifar_file:
-  data = pickle.load(cifar_file, encoding = 'bytes')
+  data = pickle.load(cifar_file)
   train_images_raw = data[b"data"]
   train_labels_raw = data[b"fine_labels"]
 
 test_file_name = "../../../testing-data/cifar-100/test"
 with open(test_file_name, 'rb') as cifar_file:
-  test = pickle.load(cifar_file, encoding = 'bytes')
+  test = pickle.load(cifar_file)
 
-# Hardware specifications
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
 size = [32, 32, 3]
@@ -49,8 +46,9 @@ nImgsSuppClass = 5
 
 base = "/tmp/cifar-100-cosine-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:i:b:s:", ["help", 
-  "num_classes=", "num_supports=", "base_path=", "num_iterations="])
+opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "base_path=", "num_iterations=",
+  "dropout", "batch_norm", "num_layers="])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
@@ -58,16 +56,41 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "cifar-100-cosine-"
+    base = a
+    if a[-1] != "/":
+      base += "/"
+    base += "cifar-100-cosine-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-d", "--data"):
+    train_file_path = "../../../testing-data/omniglot-rotate/"
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
+  elif o in ("-o", "--dropout"):
+    dropout = True
+  elif o in ("-n", "--batch_norm"):
+    batch_norm = True
+  elif o in ("-L", "--num_layers"):
+    nKernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):
     help_message()
   else:
-    print("unhandled option")
+    print("unhandled option: "+o)
     help_message()
 
-SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH = base 
+if batch_norm:
+  SAVE_PATH += "norm-"
+if dropout:
+  SAVE_PATH += "dropout-"
+SAVE_PATH += str(len(nKernels)) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+
+LOG_DIR = "./cifar_100_network_training/cosine/"
+if batch_norm:
+  LOG_DIR += "norm/"
+if dropout:
+  LOG_DIR += "dropout/"
+LOG_DIR += str(len(nKernels)) + "/" + str(nClasses) + "/" + str(nImgsSuppClass) 
 
 train_images = []
 train_labels = []
@@ -144,23 +167,34 @@ def create_network(img, size, First = False):
   currInp = img
   layer = 0
   currFilt = size[2]
-  
-  for k in nKernels:
-    with tf.variable_scope('conv'+str(layer), 
-      reuse=tf.AUTO_REUSE) as varscope:
-      layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])
-      currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
-      convR = tf.add(convR, bias)
-      reluR = tf.nn.relu(convR)
-      poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1], 
-        strides=[1,poolS,poolS,1], padding="SAME")
-      currInp = poolR
-  
-  return currInp
+
+  with tf.name_scope("run_network"):
+    for k in nKernels:
+      with tf.variable_scope('conv'+str(layer), 
+        reuse=tf.AUTO_REUSE) as varscope:
+        layer += 1
+        weight = tf.get_variable('weight', [3,3,currFilt,k])
+        currFilt = k
+        if batch_norm:
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))
+          gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))
+          mean, variance = tf.nn.moments(convR, [0,1,2])
+          PostNormalized = tf.nn.batch_normalization(convR,mean,variance,beta,gamma,1e-10)
+          reluR = tf.nn.relu(PostNormalized)
+        else:
+          bias = tf.get_variable('bias', [k], initializer = 
+            tf.constant_initializer(0.0))
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          convR = tf.add(convR, bias)
+          reluR = tf.nn.relu(convR)
+        poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1], 
+          strides=[1,poolS,poolS,1], padding="SAME")
+        currInp = poolR
+
+    if dropout:
+      currInp = tf.nn.dropout(currInp,0.8); 
+    return currInp
 
 # Call the network created above on the qury
 query_features = create_network(q_img, size, First = True)
@@ -261,11 +295,22 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
-      ={s_imgs: suppImgs, 
-        q_img: queryImgBatch,
-        q_label: queryLabelBatch,
-       })
+    if tensorboard and step == 2:
+      writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
+      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+      run_metadata = tf.RunMetadata()
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         }, options = runOptions, run_metadata=run_metadata)
+      writer.add_run_metadata(run_metadata, 'step%d' % i)
+    else:
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         })
     
     # Observe Values
     if (step%100) == 0:
