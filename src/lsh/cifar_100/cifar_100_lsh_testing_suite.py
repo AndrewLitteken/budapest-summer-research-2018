@@ -23,19 +23,19 @@ import cifar_100
 
 cifar_100.get_data()
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+LOG_DIR = "./cifar_100_testing"
 
 train_file_path = "../../../testing-data/cifar-100/train"
 train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
 with open(train_file_path, 'rb') as cifar_file:
-  data = pickle.load(cifar_file, encoding = 'bytes')
+  data = pickle.load(cifar_file)
   train_images_raw = data[b"data"]
   train_labels_raw = data[b"fine_labels"]
 
 test_file_name = "../../../testing-data/cifar-100/test"
 with open(test_file_name, 'rb') as cifar_file:
-  test = pickle.load(cifar_file, encoding = 'bytes')
+  test = pickle.load(cifar_file)
 
 def make_dir_list(data_dir):
   path_train = "{}images_background/".format(data_dir)
@@ -76,12 +76,13 @@ model_dir = None
 one_model = False
 file_write = False
 file_write_path = None
-tensorboard = True
+tensorboard = False
 integer_range_list = [1000]
 integer_change = False
 new_set = False
 batch_norm = False
 verbose = True
+dropout = False
 
 def help_message():
   print("Testing Suite LSH Hashing for variable number of items\n")
@@ -278,15 +279,15 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
 file_objs = {}
 for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "/data/csv/cifar_100_"
+    data_file_name = "omniglot_"
     if batch_norm:
       data_file_name += "normalization_"
     data_file_name += model_style+"_lsh_"+method+".csv"
     if file_write and file_write_path:
-      file_objs[data_file_name] = open(file_write_path + data_file_name, 'w')
+      file_objs[data_file_name] = open(file_write_path + "/" + data_file_name, 'w')
     elif file_write:
-      file_objs[data_file_name] = open(base_path + data_file_name, 'w')
-    first_line = "method,model_classes,model_supports,"
+      file_objs[data_file_name] = open(base_path +"/data/csv/"+data_file_name, 'w')
+    first_line = "method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,"
     if model_style == "one_rest":
       first_line += "model_period,"
     elif model_style == "random":
@@ -333,22 +334,46 @@ for category in model_list:
     while not reference_dict:
       if end_file[index] == "cosine":
         model_style = "cosine"
-        reference_dict = (("classes", end_file[index + 1]),
-                          ("supports", end_file[index+2]))
+        if end_file[index + 1] == "norm":
+          index += 1
+          batch_norm = True
+        if end_file[index + 1] == "dropout":
+          index += 1
+          dropout = True
+        #nKernels = [64 for x in range(int(end_file[index+1]))]
+        reference_dict = (#("nLayers", end_file[index + 1]),
+                          ("classes", end_file[index + 2-1]),
+                          ("supports", end_file[index+3-1]))
       elif end_file[index] == "lsh":
         if end_file[index + 1] == "one":
-          index+=2
+          index += 2
           model_style = "lsh_one_rest"
-          reference_dict = (("classes", end_file[index + 2]),
-                            ("supports", end_file[index + 3]),
-                            ("period", end_file[index + 1]))
+          if end_file[index + 1] == "norm":
+            index += 1
+            batch_norm = True
+          if end_file[index + 1] == "dropout":
+            index += 1
+            dropout = True
+          #nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (#("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 3-1]),
+                            ("supports", end_file[index + 4-1]),
+                            ("period", end_file[index + 2-1]))
         else:
-          index+=1
           model_style = "lsh_random"
-          reference_dict = (("classes", end_file[index + 3]),
-                            ("supports", end_file[index + 4]),
-                            ("planes", end_file[index + 2]),
-                            ("training", end_file[index + 1]))
+          index += 1
+          if end_file[index + 1] == "norm":
+            index += 1
+            batch_norm = True
+          if end_file[index + 1] == "dropout":
+            index += 1
+            dropout = True
+          #nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (#("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 4 - 1]),
+                            ("supports", end_file[index + 5- 1]),
+                            ("planes", end_file[index + 3-1]),
+                            ("training", end_file[index + 2-1]))
       index+=1
     
     tf.reset_default_graph()
@@ -529,14 +554,15 @@ for category in model_list:
                         lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
                         lsh_planes = np.transpose(lsh_planes)
                     # choose random query
-                    query_value = random.choice(supp_labels)
-                    query_index = random.randint(0, len(sourceLabels) - 1)
-                    while query_value != sourceLabels[query_index] or query_index in supp_indices:
+                    # choose random query
+                    query_value = random.choice(images)
+                    query_index = random.randint(0, test_images.shape[0] - 1)
+                    while query_value != int(queryLabels[query_index]):
                       query_index += 1
-                      if query_index == len(sourceLabels):
+                      if query_index == len(test_images):
                         query_index = 0
-                    query = sourceVectors[query_index]
-                    query_label = sourceLabels[query_index]
+                    query = queryFeatureVectors[query_index]
+                    query_label = queryLabels[query_index]
 
                     if i == 1 and tensorboard:
                       batching = "non_batch/"
@@ -580,11 +606,12 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "/data/csv/cifar_100_"
+                output_file = "omniglot_"
                 if batch_norm:
                   output_file += "normalization_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
+                output += str(batch_norm)+","+str(dropout) + ","
                 for i in reference_dict:
                   output += i[1] + ","
                 output += str(nClasses)+","+str(nSuppImgs)+","
