@@ -68,7 +68,7 @@ for o, a in opts:
     base = a
     if a[-1] != "/":
       base += "/"
-    base += "omniglot-cosine-"
+    base += "cifar-lsh-random-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
   elif o in ("-d", "--data"):
@@ -92,7 +92,19 @@ for o, a in opts:
 numbers = classList[:nClasses]
 numbersTest = classList[10-nClasses:]
 
-SAVE_PATH= base + str(len(nKernels)) + "-" + str(nPlanes) + "-" + str(training)+ "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH = base 
+if batch_norm:
+  SAVE_PATH += "norm-"
+if dropout:
+  SAVE_PATH += "dropout-"
+SAVE_PATH += str(len(nKernels)) + "-" + str(nPlanes) + "-" + str(training)+ "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+
+LOG_DIR = "./cifar_network_training/lsh_random/"
+if batch_norm:
+  LOG_DIR += "norm/"
+if dropout:
+  LOG_DIR += "dropout/"
+LOG_DIR += str(len(nKernels)) + "/" + str(nPlanes) + "/" + str(training)+ "/" + str(nClasses) + "/" + str(nImgsSuppClass)
 
 train_images = []
 train_labels = []
@@ -375,11 +387,22 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
-      ={s_imgs: suppImgs, 
-        q_img: queryImgBatch,
-        q_label: queryLabelBatch,
-       })
+    if tensorboard and step == 2:
+      writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
+      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+      run_metadata = tf.RunMetadata()
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         }, options = runOptions, run_metadata=run_metadata)
+      writer.add_run_metadata(run_metadata, 'step%d' % i)
+    else:
+      ACC, LOSS, OPT = session.run([accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         })
     
     # Observe Values
     if (step%100) == 0:
