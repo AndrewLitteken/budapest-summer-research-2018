@@ -15,7 +15,7 @@ train_labels_raw = np.empty((0))
 for i in range(1,6):
   train_file_name = train_file_path + str(i)
   with open(train_file_name, 'rb') as cifar_file:
-    data = pickle.load(cifar_file, encoding = 'bytes')
+    data = pickle.load(cifar_file)
     train_images_raw = np.concatenate((train_images_raw, data[b"data"]), 
       axis = 0)
     train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), 
@@ -23,11 +23,7 @@ for i in range(1,6):
 
 test_file_name = "../../../testing-data/cifar/test_batch"
 with open(test_file_name, 'rb') as cifar_file:
-  test = pickle.load(cifar_file, encoding = 'bytes')
-
-# Hardware Specifications
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+  test = pickle.load(cifar_file)
 
 # Graph Constants
 size = [32, 32, 3]
@@ -47,6 +43,9 @@ classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = []
 numbersTest = []
 nClasses = 3
+batch_norm = False
+dropout = False
+integer_range = 100
 
 nImgsSuppClass = 5
 
@@ -56,9 +55,11 @@ base = "/tmp/cifar-lsh-random-"
 
 opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "base_path=", "num_iterations=",
-  "dropout", "batch_norm", "num_layers="])
+  "dropout", "batch_norm", "num_layers=", "num_planes="])
 
 for o, a in opts:
+  if o in ("-t"):
+    training = True
   if o in ("-c", "--num_classes"):
     nClasses = int(a)
   elif o in ("-s", "--num_supports"):
@@ -78,6 +79,8 @@ for o, a in opts:
     dropout = True
   elif o in ("-n", "--batch_norm"):
     batch_norm = True
+  elif o in ("-p", "--num_planes"):
+    nPlanes= int(a)
   elif o in ("-L", "--num_layers"):
     nKernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):

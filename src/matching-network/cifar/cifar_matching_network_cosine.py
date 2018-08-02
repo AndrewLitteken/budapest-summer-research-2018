@@ -44,6 +44,8 @@ numbers = []
 numbersTest = []
 nClasses = 3
 nImgsSuppClass = 5
+batch_norm = False
+dropout = False
 
 base = "/tmp/cifar-cosine-"
 
@@ -170,6 +172,10 @@ q_label = tf.placeholder(tf.int32, [batchS, len(numbers)])
 # image.
 
 def create_network(img, size, First = False):
+  currInp = img
+  layer = 0
+  currFilt = size[2]
+
   with tf.name_scope("run_network"):
     for k in nKernels:
       with tf.variable_scope('conv'+str(layer), 

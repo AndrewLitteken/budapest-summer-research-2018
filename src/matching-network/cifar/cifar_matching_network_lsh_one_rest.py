@@ -10,7 +10,6 @@ import math
 import sys
 import os
 
-
 train_file_path = "../../../testing-data/cifar/data_batch_"
 train_images_raw = np.empty((0, 3072))
 train_labels_raw = np.empty((0))
@@ -27,37 +26,39 @@ test_file_name = "../../../testing-data/cifar/test_batch"
 with open(test_file_name, 'rb') as cifar_file:
   test = pickle.load(cifar_file)
 
-# Hardware specifications
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
-
 # Graph Constants
 size = [32, 32, 3]
 nKernels = [64, 64, 64]
 fully_connected_nodes = 128
 poolS = 2
 
-# Training Infomration
+#Training information
 nIt = 5000
 check = 1000
 batchS = 32
-nRandPlanes = 100
-learning_rate = 1e-8
+nPlanes = 100
+nRandPlanes = 500
+learning_rate = 1e-10
 
 # Support and testing information
 classList = [1,2,3,4,5,6,7,8,9,0]
 numbers = []
 numbersTest = []
 nClasses = 3
+batch_norm = False
+dropout = False
+integer_range = 100
+period = 100
+
 nImgsSuppClass = 5
-# Plane Training information
-period = 1000
 
-base = "/tmp/cifar-lsh-one-rest-"
+training = False
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:p:i:b:s:", ["help", 
-  "num_classes=", "num_supports=", "period_length=", "base_path=", 
-  "num_iterations="])
+base = "/tmp/cifar-lsh-random-"
+
+opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "base_path=", "num_iterations=",
+  "dropout", "batch_norm", "num_layers="])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
@@ -65,19 +66,33 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "cifar-lsh-one-rest-"
-  elif o in ("-p", "--period_length"):
-    period = int(a)
+    base = a
+    if a[-1] != "/":
+      base += "/"
+    base += "omniglot-cosine-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-p", "--period"):
+    period = int(a)
+  elif o in ("-d", "--data"):
+    train_file_path = "../../../testing-data/omniglot-rotate/"
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
+  elif o in ("-o", "--dropout"):
+    dropout = True
+  elif o in ("-n", "--batch_norm"):
+    batch_norm = True
+  elif o in ("-L", "--num_layers"):
+    nKernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):
     help_message()
   else:
-    print("unhandled option")
+    print("unhandled option: "+o)
     help_message()
 
 numbers = classList[:nClasses]
 numbersTest = classList[10-nClasses:]
+
 SAVE_PATH = base + str(len(nKernels)) + "-" + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
 train_images = []
@@ -180,23 +195,33 @@ def create_network(img, size, First = False):
   layer = 0
   currFilt = size[2]
   
-  for k in nKernels:
-    with tf.variable_scope('conv'+str(layer), 
-      reuse=tf.AUTO_REUSE) as varscope:
-      layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])
-      currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
-        padding="SAME")
-      convR = tf.add(convR, bias)
-      reluR = tf.nn.relu(convR)
-      poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1],
-        strides=[1,poolS,poolS,1], padding="SAME")
-      currInp = poolR
-  
-  return currInp
+  with tf.name_scope("run_network"):
+    for k in nKernels:
+      with tf.variable_scope('conv'+str(layer), 
+        reuse=tf.AUTO_REUSE) as varscope:
+        layer += 1
+        weight = tf.get_variable('weight', [3,3,currFilt,k])
+        currFilt = k
+        if batch_norm:
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))
+          gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))
+          mean, variance = tf.nn.moments(convR, [0,1,2])
+          PostNormalized = tf.nn.batch_normalization(convR,mean,variance,beta,gamma,1e-10)
+          reluR = tf.nn.relu(PostNormalized)
+        else:
+          bias = tf.get_variable('bias', [k], initializer = 
+            tf.constant_initializer(0.0))
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          convR = tf.add(convR, bias)
+          reluR = tf.nn.relu(convR)
+        poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1], 
+          strides=[1,poolS,poolS,1], padding="SAME")
+        currInp = poolR
+
+    if dropout:
+      currInp = tf.nn.dropout(currInp,0.8); 
+    return currInp
 
 # Call the network created above on the query
 query_features = create_network(q_img, size, First = True)
@@ -262,7 +287,7 @@ with tf.name_scope("loss"):
   signed = tf.multiply(query_repeat, supports)
 
   # Apply a sigmoid function
-  tf.sigmoid(signed)
+  sigmoid = tf.sigmoid(signed)
   
   # Sum the sigmoid values to ge the similarity
   similarity = tf.reduce_sum(sigmoid, [3])
