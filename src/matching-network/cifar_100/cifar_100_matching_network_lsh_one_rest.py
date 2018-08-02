@@ -432,6 +432,8 @@ with tf.Session() as session:
         ={s_imgs: suppImgs, 
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
+          lsh_planes: planes,
+          lsh_offsets: offsets
          }, options = runOptions, run_metadata=run_metadata)
       writer.add_run_metadata(run_metadata, 'step%d' % i)
     else:
@@ -439,6 +441,8 @@ with tf.Session() as session:
         ={s_imgs: suppImgs, 
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
+          lsh_planes: planes,
+          lsh_offsets: offsets
          })
 
     # Rework the planes ever period iterations

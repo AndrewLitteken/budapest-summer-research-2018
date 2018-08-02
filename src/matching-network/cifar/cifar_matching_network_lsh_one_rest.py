@@ -450,7 +450,7 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    if tensorboard and step == 2:
+    iif tensorboard and step == 2:
       writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
       runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
       run_metadata = tf.RunMetadata()
@@ -458,6 +458,8 @@ with tf.Session() as session:
         ={s_imgs: suppImgs, 
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
+          lsh_planes: planes,
+          lsh_offsets: offsets
          }, options = runOptions, run_metadata=run_metadata)
       writer.add_run_metadata(run_metadata, 'step%d' % i)
     else:
@@ -465,6 +467,8 @@ with tf.Session() as session:
         ={s_imgs: suppImgs, 
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
+          lsh_planes: planes,
+          lsh_offsets: offsets
          })
 
     # Rework the planes ever period iterations
