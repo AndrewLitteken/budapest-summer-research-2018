@@ -67,7 +67,7 @@ for o, a in opts:
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
     base = a
-    if a[-1] == "/":
+    if a[-1] != "/":
       base += "/"
     base += "omniglot-cosine-"
   elif o in ("-i", "--num_iterations"):
