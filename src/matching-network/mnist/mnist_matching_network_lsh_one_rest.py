@@ -17,9 +17,6 @@ mnist = input_data.read_data_sets("../../../testing-data/MNIST_data/",
 def help_message():
   exit(1)
 
-# Hardware specifications
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # Graph Constants
 size = [28, 28, 1]
@@ -42,10 +39,14 @@ nClasses = 3
 
 nImgsSuppClass = 5
 period = 1000
+batch_norm = False
+dropout = False
+tensorboard = False
+
 
 base = "/tmp/mnist-lsh-one-rest-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hc:p:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnmoLc:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "period_length=", "base_path=", 
   "num_iterations="])
 
@@ -55,20 +56,42 @@ for o, a in opts:
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "mnist-lsh-one-rest-"
+    base = a
+    if a[-1] == "/":
+      base += "/"
+    base += "mnist-lsh-one-rest-"
   elif o in ("-p", "--period_length"):
     period = int(a)
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-o", "--dropout"):
+    dropout = True
+  elif o in ("-n", "--batch_norm"):
+    batch_norm = True
+  elif o in ("-L", "--num_layers"):
+    nKernels = [64 for x in range(int(a))]
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
   elif o in ("-h", "--help"):
     help_message()
   else:
-    print("unhandled option")
+    print("unhandled option: "+o)
     help_message()
 
-numbers = classList[:nClasses]
-numbersTest = classList[10-nClasses:]
-SAVE_PATH = base + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH = base
+if batch_norm:
+  SAVE_PATH += "norm-"
+if dropout:
+  SAVE_PATH += "dropout-"
+
+SAVE_PATH += str(len(nKernels)) + "-" + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+
+LOG_DIR = "./mnist_network_training/lsh_one_rest/"
+if batch_norm:
+  LOG_DIR += "norm/"
+if dropout:
+  LOG_DIR += "dropout/"
+LOG_DIR += str(len(nKernels)) + "/" + str(period)+ "/" + str(nClasses) + "/" + str(nImgsSuppClass)
 
 # Collecting sample both for query and for testing
 def get_samples(mnistNum, nSupportImgs, testing = False):
@@ -154,23 +177,34 @@ def create_network(img, size, First = False):
   layer = 0
   currFilt = size[2]
   
-  for k in nKernels:
-    with tf.variable_scope('conv'+str(layer), 
-      reuse=tf.AUTO_REUSE) as varscope:
-      layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])
-      currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1],
-        padding="SAME")
-      convR = tf.add(convR, bias)
-      reluR = tf.nn.relu(convR)
-      poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1],
-        strides=[1,poolS,poolS,1], padding="SAME")
-      currInp = poolR
-  
-  return currInp
+  with tf.name_scope("run_network"):
+    for k in nKernels:
+      with tf.variable_scope('conv'+str(layer), 
+        reuse=tf.AUTO_REUSE) as varscope:
+        layer += 1
+        weight = tf.get_variable('weight', [3,3,currFilt,k])
+        currFilt = k
+        if batch_norm:
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))
+          gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))
+          mean, variance = tf.nn.moments(convR, [0,1,2])
+          PostNormalized = tf.nn.batch_normalization(convR,mean,variance,beta,gamma,1e-10)
+          reluR = tf.nn.relu(PostNormalized)
+        else:
+          bias = tf.get_variable('bias', [k], initializer = 
+            tf.constant_initializer(0.0))
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          convR = tf.add(convR, bias)
+          reluR = tf.nn.relu(convR)
+        poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1], 
+          strides=[1,poolS,poolS,1], padding="SAME")
+        currInp = poolR
+
+    if dropout:
+      currInp = tf.nn.dropout(currInp,0.8); 
+    return currInp
+
 
 # Call the network created above on the query
 query_features = create_network(q_img, size, First = True)
@@ -182,7 +216,7 @@ query_features_shape = tf.reshape(query_features, [query_features.shape[0],
 
 # Apply LSH Matrix
 query_lsh = tf.matmul(query_features_shape, lsh_planes)
-query_lsh = tf.subtract(query_lsh, lsh_offsets)
+query_lsh = tf.add(query_lsh, lsh_offsets)
 
 # Empty Lists
 support_list = []
@@ -205,7 +239,7 @@ for k in range(nClasses):
 
     # Apply the LSH Values
     support_lsh = tf.matmul(support_shaped, lsh_planes)
-    support_lsh = tf.subtract(support_lsh, lsh_offsets)
+    support_lsh = tf.add(support_lsh, lsh_offsets)
    
     # This must be done so that we have a simple way to compare all supports
     # to one query
@@ -236,10 +270,7 @@ with tf.name_scope("loss"):
   signed = tf.multiply(query_repeat, supports)
 
   # Apply a sigmoid function
-  sigmoid = tf.divide(tf.constant(1.0),
-    tf.clip_by_value(tf.add(tf.constant(1.0),
-    tf.exp(tf.multiply(tf.constant(k), signed))),
-    1e-10, float("inf")))
+  sigmoid = tf.sigmoid(signed)
   
   # Sum the sigmoid values to ge the similarity
   similarity = tf.reduce_sum(sigmoid, [3])
@@ -400,14 +431,23 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, 
-      loss, optimizer], feed_dict
-      ={s_imgs: suppImgs, 
-        q_img: queryImgBatch,
-        q_label: queryLabelBatch,
-        lsh_planes: planes,
-        lsh_offsets: offsets
-       })
+    # Run the session with the optimizer
+    if tensorboard and step == 2:
+      writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
+      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+      run_metadata = tf.RunMetadata()
+      SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         }, options = runOptions, run_metadata=run_metadata)
+      writer.add_run_metadata(run_metadata, 'step%d' % i)
+    else:
+      SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         })
 
     # Rework the planes ever period iterations
     if (step % period) == 0:
