@@ -49,6 +49,9 @@ batchS = 32
 nRandPlanes = 100
 learning_rate = 1e-5
 period = 1000
+batch_norm = False
+dropout = False
+tensorboard = False
 
 # Support and testing infromation
 nClasses = 3
@@ -74,6 +77,8 @@ for o, a in opts:
     period = int(a)
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
   elif o in ("-o", "--dropout"):
     dropout = True
   elif o in ("-n", "--batch_norm"):
