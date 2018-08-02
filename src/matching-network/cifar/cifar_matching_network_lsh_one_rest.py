@@ -17,7 +17,7 @@ train_labels_raw = np.empty((0))
 for i in range(1,6):
   train_file_name = train_file_path + str(i)
   with open(train_file_name, 'rb') as cifar_file:
-    data = pickle.load(cifar_file, encoding = 'bytes')
+    data = pickle.load(cifar_file)
     train_images_raw = np.concatenate((train_images_raw, data[b"data"]), 
       axis = 0)
     train_labels_raw = np.concatenate((train_labels_raw, data[b"labels"]), 
@@ -25,7 +25,7 @@ for i in range(1,6):
 
 test_file_name = "../../../testing-data/cifar/test_batch"
 with open(test_file_name, 'rb') as cifar_file:
-  test = pickle.load(cifar_file, encoding = 'bytes')
+  test = pickle.load(cifar_file)
 
 # Hardware specifications
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID" 
@@ -262,10 +262,7 @@ with tf.name_scope("loss"):
   signed = tf.multiply(query_repeat, supports)
 
   # Apply a sigmoid function
-  sigmoid = tf.divide(tf.constant(1.0),
-    tf.clip_by_value(tf.add(tf.constant(1.0),
-    tf.exp(tf.multiply(tf.constant(k), signed))),
-    1e-10, float("inf")))
+  tf.sigmoid(signed)
   
   # Sum the sigmoid values to ge the similarity
   similarity = tf.reduce_sum(sigmoid, [3])
@@ -331,17 +328,7 @@ def gen_lsh_pick_planes(nPlanes, feature_vectors, labels):
     # Add onto the matrix
     lsh_matrix.append(clf.coef_[0])
 
-    # Deal with the offset for each plane
-    temp_vec = [0]*len(feature_vectors[0])
-
-    for j in range(0, len(feature_vectors[0])):
-      if clf.coef_[0][j] != 0:
-        temp_vec[j] = -1*clf.intercept_[0] / clf.coef_[0][j]
-        break
-
-    # Apply matrix to offset values 
-    temp_mul = np.matmul(np.asarray(temp_vec), lsh_matrix[i])
-    lsh_offset_vals.append(temp_mul)
+    lsh_offset_vals.append(clf.intercept_[0])
 
   # Adjust the shape
   lsh_matrix = np.transpose(lsh_matrix)

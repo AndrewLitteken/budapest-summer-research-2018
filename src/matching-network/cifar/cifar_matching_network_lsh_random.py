@@ -54,27 +54,36 @@ training = False
 
 base = "/tmp/cifar-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "htc:p:i:b:s:", ["help", 
-  "num_classes=", "num_supports=", "num_planes=", "base_path=", 
-  "num_iterations=", "training"])
+opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 
+  "num_classes=", "num_supports=", "base_path=", "num_iterations=",
+  "dropout", "batch_norm", "num_layers="])
 
 for o, a in opts:
-  if o in ("-t", "--training"):
-    training = True
-  elif o in ("-c", "--num_classes"):
+  if o in ("-c", "--num_classes"):
     nClasses = int(a)
   elif o in ("-s", "--num_supports"):
     nImgsSuppClass = int(a)
   elif o in ("-b", "--base_path"):
-    base = a + "cifar-lsh-random-"
-  elif o in ("-p", "--num_planes"):
-    nPlanes = int(a)
+    base = a
+    if a[-1] != "/":
+      base += "/"
+    base += "omniglot-cosine-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
+  elif o in ("-d", "--data"):
+    train_file_path = "../../../testing-data/omniglot-rotate/"
+  elif o in ("-m", "--meta_tensorboard"):
+    tensorboard = True
+  elif o in ("-o", "--dropout"):
+    dropout = True
+  elif o in ("-n", "--batch_norm"):
+    batch_norm = True
+  elif o in ("-L", "--num_layers"):
+    nKernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):
     help_message()
   else:
-    print("unhandled option")
+    print("unhandled option: "+o)
     help_message()
 
 numbers = classList[:nClasses]
@@ -173,23 +182,33 @@ def create_network(img, size, First = False):
   layer = 0
   currFilt = size[2]
   
-  for k in nKernels:
-    with tf.variable_scope('conv'+str(layer), 
-      reuse=tf.AUTO_REUSE) as varscope:
-      layer += 1
-      weight = tf.get_variable('weight', [3,3,currFilt,k])
-      currFilt = k
-      bias = tf.get_variable('bias', [k], initializer = 
-        tf.constant_initializer(0.0))
-      convR = tf.nn.conv2d(currInp, weight, strides = [1,1,1,1], padding = 
-        "SAME")
-      convR = tf.add(convR, bias)
-      reluR = tf.nn.relu(convR)
-      poolR = tf.nn.max_pool(reluR, ksize = [1,poolS,poolS,1], 
-        strides = [1,poolS,poolS,1], padding = "SAME")
-      currInp = poolR
-  
-  return currInp
+  with tf.name_scope("run_network"):
+    for k in nKernels:
+      with tf.variable_scope('conv'+str(layer), 
+        reuse=tf.AUTO_REUSE) as varscope:
+        layer += 1
+        weight = tf.get_variable('weight', [3,3,currFilt,k])
+        currFilt = k
+        if batch_norm:
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          beta = tf.get_variable('beta', [k], initializer = tf.constant_initializer(0.0))
+          gamma = tf.get_variable('gamma', [k], initializer=tf.constant_initializer(1.0))
+          mean, variance = tf.nn.moments(convR, [0,1,2])
+          PostNormalized = tf.nn.batch_normalization(convR,mean,variance,beta,gamma,1e-10)
+          reluR = tf.nn.relu(PostNormalized)
+        else:
+          bias = tf.get_variable('bias', [k], initializer = 
+            tf.constant_initializer(0.0))
+          convR = tf.nn.conv2d(currInp, weight, strides=[1,1,1,1], padding="SAME")
+          convR = tf.add(convR, bias)
+          reluR = tf.nn.relu(convR)
+        poolR = tf.nn.max_pool(reluR, ksize=[1,poolS,poolS,1], 
+          strides=[1,poolS,poolS,1], padding="SAME")
+        currInp = poolR
+
+    if dropout:
+      currInp = tf.nn.dropout(currInp,0.8); 
+    return currInp
 
 def generate_lsh_planes(features, nPlanes):
   with tf.variable_scope('lshPlanes', reuse=tf.AUTO_REUSE) as varscope:
@@ -204,11 +223,24 @@ def generate_lsh_planes(features, nPlanes):
 
   return plane, offset
 
+def generate_int_lsh_planes(features, nPlanes):
+  with tf.variable_scope('lshPlanes', reuse=tf.AUTO_REUSE) as varscope:
+    # Generate enough planes of random slopes
+    plane = tf.get_variable('plane', initializer = 
+      (tf.random_uniform([tf.cast(features.shape[1] * features.shape[2] * 
+      features.shape[3], tf.int32), nPlanes], minval = -integer_range, maxval = integer_range)),
+      trainable=training)
+
+    offset = tf.get_variable('offsets', initializer = tf.zeros([nPlanes], 
+      tf.float32), trainable = False)
+
+  return plane, offset
+
 # Call the network created above on the query
 query_features = create_network(q_img, size, First = True)
 
 # Create the random vlalues
-lsh_planes, lsh_offsets = generate_lsh_planes(query_features, nPlanes)
+lsh_planes, lsh_offsets = generate_int_lsh_planes(query_features, nPlanes)
 
 # Reshape to fit the limits for lsh application
 query_features_shape = tf.reshape(query_features, [query_features.shape[0], 
@@ -265,7 +297,7 @@ with tf.name_scope("loss"):
   #supports = tf.Print(supports, [supports], summarize = 200)
   signed = tf.multiply(query_repeat, supports)
   #signed = tf.Print(signed, [signed], summarize = 200)
-  sigmoid = tf.divide(tf.constant(1.0), tf.add(tf.constant(1.0), tf.exp(tf.multiply(tf.constant(k), signed))))
+  sigmoid = tf.sigmoid(signed)
   #sigmoid = tf.Print(sigmoid, [sigmoid], summarize = 200)
 
   # Sum the sigmoid values to ge the similarity
