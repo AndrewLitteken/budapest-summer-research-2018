@@ -83,7 +83,7 @@ for o, a in opts:
 numbers = classList[:nClasses]
 numbersTest = classList[10-nClasses:]
 
-SAVE_PATH = base + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH = base + str(len(nKernels)) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
 
 
 train_images = []
