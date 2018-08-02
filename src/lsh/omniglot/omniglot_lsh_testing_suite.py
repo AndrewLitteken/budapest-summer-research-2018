@@ -111,6 +111,7 @@ integer_change = False
 new_set = False
 batch_norm = False
 verbose = True
+dropout = False
 
 def help_message():
   print("Testing Suite LSH Hashing for variable number of items\n")
@@ -119,7 +120,6 @@ def help_message():
 
   print("Options:")
   print("-f,--file_write:         write info to file")
-  print("-b,--batch_norm:         use batch norm model")
   print("-t,--tensorboard:        write info to file")
   print("-c,--num_classes_list:   input list of classes")
   print("-r,--integer_range:      list of ranges for integers for plane")
@@ -132,14 +132,18 @@ def help_message():
   print("-i,--num_iterations:     number of test iterations")
   print("-n,--new_support_set:    get new support set for each trial")
   print("-v,--non_verbose:        no results printed to console")
+  print("-e,--extend_data:        extend data to use rotated images")
+  print("-o,--dropout:            dropout")
+  print("-L,--num_layers:         number of convolution layers in use")
   print("")
   exit(1)
 
-opts, args = getopt.getopt(sys.argv[1:], "hnbvtf:c:r:s:p:u:d:i:m:l:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnbvetof:c:r:s:p:u:d:i:m:l:L:", ["help", 
   "batch_norm","new_support_set","num_classes_list=", "num_supports_list=", 
   "num_iterations=","num_planes_list=","unseen_list=","model_dir=",
   "hashing_methods=","model_loc=","integer_range=","tensorboard=",
-  "file_write=","no_verbose","tensorboard"])
+  "file_write=","no_verbose","tensorboard","extend_data","dropout",
+  "num_layers="])
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
@@ -157,6 +161,10 @@ for o, a in opts:
     nPlanes_list = [int(i) for i in a.split(",")]
   elif o in ("-i", "--num_iterations"):
     nTrials = int(a)
+  elif o in ("-e", "--extend_data"):
+    train_file_path = base_path+"/testing-data/omniglot-rotate/"
+  elif o in ("-L", "--num_layers"):
+    num_kernels = [64 for x in range(int(a))]
   elif o in ("-h", "--help"):
     help_message()
   elif o in ("-u", "--unseen"):
@@ -179,12 +187,12 @@ for o, a in opts:
   elif o in ("-m", "--hashing_methods"):
     hashing_methods = [i for i in a.split(",") if (i == "one_rest" or 
       i == "random")]
-  elif o in ("-b", "--batch_norm"):
-    batch_norm = True
   elif o in ("-n", "--new_support_set"):
     new_set = True
   elif o in ("-v", "--non_verbose"):
     verbose = False
+  elif o in ("-o", "--dropout"):
+    dropout = True
   else:
     print("unhandled option "+o)
     help_message()
@@ -221,7 +229,8 @@ def create_network(img, size, First = False):
       poolR = tf.nn.max_pool(reluR, ksize=[1,2,2,1], strides=[1,2,2,1], 
         padding="SAME")
       currInp = poolR
-  
+  if dropout:
+    currInp = tf.nn.dropout(currInp, 0.8)
   return currInp
 
 def cos_similarities(supports, query):
@@ -309,15 +318,15 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
 file_objs = {}
 for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "/data/csv/omniglot_"
+    data_file_name = "omniglot_"
     if batch_norm:
       data_file_name += "normalization_"
     data_file_name += model_style+"_lsh_"+method+".csv"
     if file_write and file_write_path:
-      file_objs[data_file_name] = open(file_write_path + data_file_name, 'w')
+      file_objs[data_file_name] = open(file_write_path + "/" + data_file_name, 'w')
     elif file_write:
-      file_objs[data_file_name] = open(base_path + data_file_name, 'w')
-    first_line = "method,model_classes,model_supports,"
+      file_objs[data_file_name] = open(base_path +"/data/csv/"+data_file_name, 'w')
+    first_line = "method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,"
     if model_style == "one_rest":
       first_line += "model_period,"
     elif model_style == "random":
@@ -361,88 +370,124 @@ for category in model_list:
     index = 0
     reference_dict = None
     model_style = None
+    batch_norm = False
+    dropout = False
     while not reference_dict:
       if end_file[index] == "cosine":
         model_style = "cosine"
-        reference_dict = (("classes", end_file[index + 1]),
-                          ("supports", end_file[index+2]))
+        if end_file[index + 1] == "norm":
+          index += 1
+          batch_norm = True
+        if end_file[index + 1] == "dropout":
+          index += 1
+          dropout = True
+        nKernels = [64 for x in range(int(end_file[index+1]))]
+        reference_dict = (("nLayers", end_file[index + 1]),
+                          ("classes", end_file[index + 2]),
+                          ("supports", end_file[index+3]))
       elif end_file[index] == "lsh":
         if end_file[index + 1] == "one":
+          index += 2
           model_style = "lsh_one_rest"
-          reference_dict = (("classes", end_file[index + 4]),
-                            ("supports", end_file[index + 5]),
-                            ("period", end_file[index + 3]))
+          if end_file[index + 1] == "norm":
+            index += 1
+            batch_norm = True
+          if end_file[index + 1] == "dropout":
+            index += 1
+            dropout = True
+          nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 3]),
+                            ("supports", end_file[index + 4]),
+                            ("period", end_file[index + 2]))
         else:
           model_style = "lsh_random"
-          reference_dict = (("classes", end_file[index + 4]),
+          index += 1
+          if end_file[index + 1] == "norm":
+            index += 1
+            batch_norm = True
+          if end_file[index + 1] == "dropout":
+            index += 1
+            dropout = True
+          nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 4]),
                             ("supports", end_file[index + 5]),
                             ("planes", end_file[index + 3]),
                             ("training", end_file[index + 2]))
       index+=1
-    
-    tf.reset_default_graph()
+    for unseen in unseen_list:
+      tf.reset_default_graph()
 
-    # Query Information - Vector of images
-    dataset = tf.placeholder(tf.float32, [None]+size)
+      # Query Information - Vector of images
+      dataset = tf.placeholder(tf.float32, [None]+size)
 
-    features = create_network(dataset, size)
+      features = create_network(dataset, size)
 
-    init = tf.global_variables_initializer()
+      init = tf.global_variables_initializer()
 
-    with tf.Session() as session:
-      session.run(init)
+      with tf.Session() as session:
+        session.run(init)
 
-      Saver = tf.train.Saver()
-      Saver.restore(session, SAVE_PATH)
+        Saver = tf.train.Saver()
+        Saver.restore(session, SAVE_PATH)
 
-      rawDataset = train_images
-      rawLabels = train_labels
+        if not unseen:  
+          rawDataset = train_images
+          rawLabels = train_labels
 
-      featureVectors = None
-      for i in range(int(len(rawDataset)/batchS)):
-        FEAT = (session.run([features], feed_dict =
-          {dataset: rawDataset[i*batchS:(i+1)*batchS]}))
-        FEAT = np.asarray(FEAT)
-        if featureVectors is None:
-          featureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
-            FEAT.shape[3], FEAT.shape[4]])
-        featureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
-      featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
+          featureVectors = None
+          for i in range(int(len(rawDataset)/batchS)):
+            FEAT = (session.run([features], feed_dict =
+              {dataset: rawDataset[i*batchS:(i+1)*batchS]}))
+            FEAT = np.asarray(FEAT)
+            if featureVectors is None:
+              featureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
+                FEAT.shape[3], FEAT.shape[4]])
+            featureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
+          featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
 
-      queryDataset = test_images
-      queryLabels = test_labels
+        else:
+          queryDataset = test_images
+          queryLabels = test_labels
 
-      queryFeatureVectors = None
-      for i in range(int(len(queryDataset)/batchS)):
-        FEAT = (session.run([features], feed_dict =
-          {dataset: queryDataset[i*batchS:(i+1)*batchS]}))
-        FEAT = np.asarray(FEAT)
-        if queryFeatureVectors is None:
-          queryFeatureVectors = np.empty([len(queryDataset), 
-            FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
-        queryFeatureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
-      queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))
+          queryFeatureVectors = None
+          for i in range(int(len(queryDataset)/batchS)):
+            FEAT = (session.run([features], feed_dict =
+              {dataset: queryDataset[i*batchS:(i+1)*batchS]}))
+            FEAT = np.asarray(FEAT)
+            if queryFeatureVectors is None:
+              queryFeatureVectors = np.empty([len(queryDataset), 
+                FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+            queryFeatureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
+          queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))
 
-    for method in hashing_methods:
-      for nPlanes in nPlanes_list:
-        for nClasses in nClasses_list:
-          if method == "one_rest":
-            nPlanes = nClasses
-          for unseen in unseen_list:
+      for method in hashing_methods:
+        for nPlanes in nPlanes_list:
+          for nClasses in nClasses_list:
+            if method == "one_rest":
+              nPlanes = nClasses
             for nSuppImgs in nSuppImgs_list:
               for integer_range in integer_range_list:  
                 tf.reset_default_graph()
 
+                if unseen:
+                  sourceVectors = queryFeatureVectors
+                  sourceLabels = queryLabels
+                else:
+                  sourceVectors = featureVectors
+                  sourceLabels = rawLabels
+
                 nSupp = nClasses * nSuppImgs
                 with tf.name_scope("support_setup"):
-                  support_vectors = tf.placeholder(tf.float32, [nSupp, featureVectors.shape[1]], name = "support_feature_vectors")
-                  lsh_planes_tf = tf.placeholder(tf.float32, [queryFeatureVectors.shape[1], nPlanes], name = "lsh_planes")
+                  support_vectors = tf.placeholder(tf.float32, [nSupp, sourceVectors.shape[1]], name = "support_feature_vectors")
+                  lsh_planes_tf = tf.placeholder(tf.float32, [sourceVectors.shape[1], nPlanes], name = "lsh_planes")
                   lsh_offsets_tf = tf.placeholder(tf.float32, [nPlanes], name = "lsh_offsets")
 
                   supp_sig = lsh_sig_hash(support_vectors, lsh_planes_tf, lsh_offsets_tf)
                   supp_true = lsh_true_hash(supp_sig)
 
-                query_vector = tf.placeholder(tf.float32, [1, queryFeatureVectors.shape[1]], name = "query_feature_vector")
+                query_vector = tf.placeholder(tf.float32, [1, sourceVectors.shape[1]], name = "query_feature_vector")
                 summary = tf.summary.merge_all()
                 #with tf.name_scope("cosine"):
                 #  with tf.name_scope("cosine_distance"):
@@ -477,15 +522,9 @@ for category in model_list:
                 lsh_acc = 0
                 lsh_acc2 = 0
                 # choose random support vectors
-                if unseen:
-                  sourceVectors = queryFeatureVectors
-                  sourceLabels = queryLabels
-                else:
-                  sourceVectors = featureVectors
-                  sourceLabels = rawLabels
 
                 if method == "random":
-                  lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
+                  lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, sourceVectors[:nSupportTraining], sourceLabels)
 
                 if not new_set:
                   supp = []
@@ -595,11 +634,12 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "/data/csv/omniglot_"
+                output_file = "omniglot_"
                 if batch_norm:
                   output_file += "normalization_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
+                output += str(batch_norm)+","+str(dropout) + ","
                 for i in reference_dict:
                   output += i[1] + ","
                 output += str(nClasses)+","+str(nSuppImgs)+","
@@ -611,8 +651,8 @@ for category in model_list:
                   print(output)
                 if file_write:
                   file_objs[output_file].write(output + "\n")
-        if method == "one_rest":
-          break
+          if method == "one_rest":
+            break
 
 for file_obj in file_objs.keys():
   file_objs[file_obj].close() 
