@@ -69,7 +69,7 @@ for o, a in opts:
     base = a
     if a[-1] != "/":
       base += "/"
-    base += "omniglot-cosine-"
+    base += "cifar-lsh-one-rest-"
   elif o in ("-i", "--num_iterations"):
     nIt = int(a)
   elif o in ("-p", "--period"):
@@ -93,7 +93,19 @@ for o, a in opts:
 numbers = classList[:nClasses]
 numbersTest = classList[10-nClasses:]
 
-SAVE_PATH = base + str(len(nKernels)) + "-" + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+SAVE_PATH = base 
+if batch_norm:
+  SAVE_PATH += "norm-"
+if dropout:
+  SAVE_PATH += "dropout-"
+SAVE_PATH += str(len(nKernels)) + "-" + str(period) + "-" + str(nClasses) + "-" + str(nImgsSuppClass)
+
+LOG_DIR = "./cifar_network_training/lsh_one_rest/"
+if batch_norm:
+  LOG_DIR += "norm/"
+if dropout:
+  LOG_DIR += "dropout/"
+LOG_DIR += str(len(nKernels)) + "/" + str(period) + "/" + str(nClasses) + "/" + str(nImgsSuppClass)
 
 train_images = []
 train_labels = []
@@ -233,7 +245,7 @@ query_features_shape = tf.reshape(query_features, [query_features.shape[0],
 
 # Apply LSH Matrix
 query_lsh = tf.matmul(query_features_shape, lsh_planes)
-query_lsh = tf.subtract(query_lsh, lsh_offsets)
+query_lsh = tf.add(query_lsh, lsh_offsets)
 
 # Empty Lists
 support_list = []
@@ -256,7 +268,7 @@ for k in range(nClasses):
 
     # Apply the LSH Values
     support_lsh = tf.matmul(support_shaped, lsh_planes)
-    support_lsh = tf.subtract(support_lsh, lsh_offsets)
+    support_lsh = tf.add(support_lsh, lsh_offsets)
    
     # This must be done so that we have a simple way to compare all supports
     # to one query
@@ -438,14 +450,22 @@ with tf.Session() as session:
     suppImgs, suppLabels, queryImgBatch, queryLabelBatch = get_next_batch()
     
     # Run the session with the optimizer
-    SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, 
-      loss, optimizer], feed_dict
-      ={s_imgs: suppImgs, 
-        q_img: queryImgBatch,
-        q_label: queryLabelBatch,
-        lsh_planes: planes,
-        lsh_offsets: offsets
-       })
+    if tensorboard and step == 2:
+      writer = tf.summary.FileWriter(LOG_DIR + "/" + str(step), session.graph)
+      runOptions = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+      run_metadata = tf.RunMetadata()
+      SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         }, options = runOptions, run_metadata=run_metadata)
+      writer.add_run_metadata(run_metadata, 'step%d' % i)
+    else:
+      SFV, ACC, LOSS, OPT = session.run([support_feature_vectors, accuracy, loss, optimizer], feed_dict
+        ={s_imgs: suppImgs, 
+          q_img: queryImgBatch,
+          q_label: queryLabelBatch,
+         })
 
     # Rework the planes ever period iterations
     if (step % period) == 0:
