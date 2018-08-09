@@ -1,2 +1,2 @@
-model_checkpoint_path: "/afs/crc.nd.edu/user/a/alitteke/research/2018-summer-niemier/budapest-summer-research-2018/models/mnist/lsh_random/minst-lsh-random-1000-6-5-True-7500"
-all_model_checkpoint_paths: "/afs/crc.nd.edu/user/a/alitteke/research/2018-summer-niemier/budapest-summer-research-2018/models/mnist/lsh_random/minst-lsh-random-1000-6-5-True-7500"
+model_checkpoint_path: "mnist-lsh-random-norm-dropout-3-False-1000-5-5-10000"
+all_model_checkpoint_paths: "mnist-lsh-random-norm-dropout-3-False-1000-5-5-10000"

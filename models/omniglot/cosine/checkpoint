@@ -1,2 +1,2 @@
-model_checkpoint_path: "/afs/crc.nd.edu/user/a/alitteke/research/2018-summer-niemier/budapest-summer-research-2018/models/omniglot/cosine/omniglot-cosine-20-5-15000"
-all_model_checkpoint_paths: "/afs/crc.nd.edu/user/a/alitteke/research/2018-summer-niemier/budapest-summer-research-2018/models/omniglot/cosine/omniglot-cosine-20-5-15000"
+model_checkpoint_path: "omniglot-cosine-norm-dropout-4-30-5-10000"
+all_model_checkpoint_paths: "omniglot-cosine-norm-dropout-4-30-5-10000"
