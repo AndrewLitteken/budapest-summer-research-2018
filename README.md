@@ -18,14 +18,17 @@ The embeddings mentioned ideally have some sense of locality in the space, so we
 All the programs used to generate the networks are in `[data-source-name]_matching_network_[distance_metric].py` and can be configured to use batch normalization dropout, and how many classes and supports to use per run.  You can also specify the end location of the model.
 
 ## Testing Inference Accuracy
-To test a networks accuracy you can use the program `[data-source-name]_lsh_testing_suite.py`.  Specify the model to use by using the `-l` flag.  You can specify and output file location by using the `-f` flag.
+To test a networks accuracy you can use the program `[data-source-name]_lsh_testing_suite.py`.  Specify the model to use by using the `-l` flag.  You can specify and output file location by using the `-f` flag.  Use the `-t` flag to save tensorflow statistics.
 
 ## Results Summary
+Looking in the data folder, you can find results for how the accuracy increases as the number of planes increases.  Usually this was done on models with 10000 iterations, 3 convolutions, batch normalization and dropout with a keep rate of 0.8.
 
+In the metadata section you can find Tensorboard logs where it can be found that under certain number of planes, LSH can be more efficient on a GPU in terms of both memory and time.
 
 ## Preliminary Extra Explorations
 
 ### LSH Specialized Planes
-
+This is an attempt to achieve the same LSH accuracy through less planes. One method was to use a one-vs-rest method of each class against another, so that each class would have a defined sequence that is only as long as the number of classes.  Any of these attempts are under the name `one-rest`.
 
 ### Using LSH to Train Matching Network Embedding Functions
+The networks that can be used to generate embedding functions that are trained with LSH to improve performance can be found with the suffix `...matching_network_lsh_*.py`.
