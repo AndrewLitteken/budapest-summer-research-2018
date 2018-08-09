@@ -316,7 +316,7 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
     return dist2
 
 file_objs = {}
-for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
+for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
     data_file_name = "omniglot_"
     if batch_norm:
@@ -635,8 +635,6 @@ for category in model_list:
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
                 output_file = "omniglot_"
-                if batch_norm:
-                  output_file += "normalization_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 output += str(batch_norm)+","+str(dropout) + ","

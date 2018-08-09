@@ -46,7 +46,7 @@ nClasses = 3
 nImgsSuppClass = 5
 batch_norm = False
 dropout = False
-
+tensorboard = False
 base = "/tmp/cifar-cosine-"
 
 opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 

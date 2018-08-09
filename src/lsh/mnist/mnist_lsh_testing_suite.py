@@ -54,6 +54,7 @@ integer_range_list = [1000]
 integer_change = False
 new_set = False
 batch_norm = False
+dropout = False
 verbose = True
 
 def help_message():
@@ -79,7 +80,7 @@ def help_message():
   print("")
   exit(1)
 
-opts, args = getopt.getopt(sys.argv[1:], "hnbvtf:c:r:s:p:u:d:i:m:l:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnbvotf:c:r:s:p:u:d:i:m:l:", ["help", 
   "batch_norm","new_support_set","num_classes_list=", "num_supports_list=", 
   "num_iterations=","num_planes_list=","unseen_list=","model_dir=",
   "hashing_methods=","model_loc=","integer_range=","tensorboard=",
@@ -128,6 +129,8 @@ for o, a in opts:
       i == "random")]
   elif o in ("-b", "--batch_norm"):
     batch_norm = True
+  elif o in ("-o", "--dropout"):
+    dropout = True
   elif o in ("-n", "--new_support_set"):
     new_set = True
   elif o in ("-v", "--non_verbose"):
@@ -254,17 +257,17 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
     return dist2
 
 file_objs = {}
-for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
+for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "/data/csv/mnist_"
+    data_file_name = "mnist_"
     if batch_norm:
       data_file_name += "normalization_"
     data_file_name += model_style+"_lsh_"+method+".csv"
     if file_write and file_write_path:
-      file_objs[data_file_name] = open(file_write_path + data_file_name, 'w')
+      file_objs[data_file_name] = open(file_write_path + "/" + data_file_name, 'w')
     elif file_write:
-      file_objs[data_file_name] = open(base_path + data_file_name, 'w')
-    first_line = "method,model_classes,model_supports,"
+      file_objs[data_file_name] = open(base_path +"/data/csv/"+data_file_name, 'w')
+    first_line = "method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,"
     if model_style == "one_rest":
       first_line += "model_period,"
     elif model_style == "random":
@@ -304,24 +307,51 @@ for category in model_list:
       SAVE_PATH = model_dir + "/" + category + "/" + model_name    
 
     end_file = file_name.split("-")
-
     index = 0
     reference_dict = None
     model_style = None
+    batch_norm = False
+    dropout = False
     while not reference_dict:
       if end_file[index] == "cosine":
         model_style = "cosine"
-        reference_dict = (("classes", end_file[index + 1]),
-                          ("supports", end_file[index+2]))
+        if end_file[index + 1] == "norm":
+          index += 1
+          batch_norm = True
+        if end_file[index + 1] == "dropout":
+          index += 1
+          dropout = True
+        nKernels = [64 for x in range(int(end_file[index+1]))]
+        reference_dict = (("nLayers", end_file[index + 1]),
+                          ("classes", end_file[index + 2]),
+                          ("supports", end_file[index+3]))
       elif end_file[index] == "lsh":
         if end_file[index + 1] == "one":
+          index += 2
           model_style = "lsh_one_rest"
-          reference_dict = (("classes", end_file[index + 4]),
-                            ("supports", end_file[index + 5]),
-                            ("period", end_file[index + 3]))
+          if end_file[index + 1] == "norm":
+            index += 1
+            batch_norm = True
+          if end_file[index + 1] == "dropout":
+            index += 1
+            dropout = True
+          nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 3]),
+                            ("supports", end_file[index + 4]),
+                            ("period", end_file[index + 2]))
         else:
           model_style = "lsh_random"
-          reference_dict = (("classes", end_file[index + 4]),
+          index += 1
+          if end_file[index + 1] == "norm":
+            index += 1
+            batch_norm = True
+          if end_file[index + 1] == "dropout":
+            index += 1
+            dropout = True
+          nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 4]),
                             ("supports", end_file[index + 5]),
                             ("planes", end_file[index + 3]),
                             ("training", end_file[index + 2]))
@@ -522,11 +552,10 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "/data/csv/mnist_"
-                if batch_norm:
-                  output_file += "normalization_"
+                output_file = "mnist_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
+                output += str(batch_norm)+","+str(dropout) + ","
                 for i in reference_dict:
                   output += i[1] + ","
                 output += str(nClasses)+","+str(nSuppImgs)+","

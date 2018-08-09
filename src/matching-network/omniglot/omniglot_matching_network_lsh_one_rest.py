@@ -225,38 +225,38 @@ support_features = []
 
 with tf.name_scope("organization_multiplication"):
 # Iterate through each class and each support image in that class
-for k in range(nClasses):
-  slist=[]
-  qlist=[]
-  for i in range(nImgsSuppClass):
-    support_result = create_network(s_imgs[:, k, i, :, :, :], size)
-    # Fit the results to match the supports matrix multiplication
-    support_shaped = tf.reshape(support_result, [support_result.shape[0], 
-      support_result.shape[1] * support_result.shape[2] *
-      support_result.shape[3]])
-    # For access in the session
-    support_features.append(support_shaped)
+  for k in range(nClasses):
+	slist=[]
+	qlist=[]
+	for i in range(nImgsSuppClass):
+	  support_result = create_network(s_imgs[:, k, i, :, :, :], size)
+	  # Fit the results to match the supports matrix multiplication
+	  support_shaped = tf.reshape(support_result, [support_result.shape[0], 
+		support_result.shape[1] * support_result.shape[2] *
+		support_result.shape[3]])
+	  # For access in the session
+	  support_features.append(support_shaped)
 
-    # Apply the LSH Values
-    support_lsh = tf.matmul(support_shaped, lsh_planes)
-    #support_lsh = tf.subtract(support_lsh, lsh_offsets)
-    support_lsh = tf.add(support_lsh, lsh_offsets)
-   
-    # This must be done so that we have a simple way to compare all supports
-    # to one query
-    slist.append(support_lsh)
-    qlist.append(query_lsh)
+	  # Apply the LSH Values
+	  support_lsh = tf.matmul(support_shaped, lsh_planes)
+	  #support_lsh = tf.subtract(support_lsh, lsh_offsets)
+	  support_lsh = tf.add(support_lsh, lsh_offsets)
+	 
+	  # This must be done so that we have a simple way to compare all supports
+	  # to one query
+	  slist.append(support_lsh)
+	  qlist.append(query_lsh)
 
-  # Create tensorflow stack
-  slist = tf.stack(slist)
-  qlist = tf.stack(qlist)
-  support_list.append(slist)
-  query_list.append(qlist)
+	# Create tensorflow stack
+	slist = tf.stack(slist)
+	qlist = tf.stack(qlist)
+	support_list.append(slist)
+	query_list.append(qlist)
 
-# Make a stack to compare the query to every support
-support_feature_vectors = tf.stack(support_features)
-query_repeat = tf.stack(query_list)
-supports = tf.stack(support_list)
+  # Make a stack to compare the query to every support
+  support_feature_vectors = tf.stack(support_features)
+  query_repeat = tf.stack(query_list)
+  supports = tf.stack(support_list)
 
 # Loss
 # LSH Calculation: multiplication of two vectors, use sigmoid to estimate
@@ -423,6 +423,8 @@ with tf.Session() as session:
         ={s_imgs: suppImgs, 
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
+          lsh_planes: planes,
+          lsh_offsets: offsets
          }, options = runOptions, run_metadata=run_metadata)
       writer.add_run_metadata(run_metadata, 'step%d' % i)
     else:
@@ -430,6 +432,8 @@ with tf.Session() as session:
         ={s_imgs: suppImgs, 
           q_img: queryImgBatch,
           q_label: queryLabelBatch,
+          lsh_planes: planes,
+          lsh_offsets: offsets
          })
     # Rework the planes ever period iterations
     if (step % period) == 0:

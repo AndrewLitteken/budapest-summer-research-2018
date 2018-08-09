@@ -175,7 +175,10 @@ def create_network(img, size, First = False):
       poolR = tf.nn.max_pool(reluR, ksize=[1,2,2,1], strides=[1,2,2,1], 
         padding="SAME")
       currInp = poolR
-  
+
+  if dropout:
+    currInp = tf.nn.dropout(currInp, 0.8)
+  print(currInp.shape)  
   return currInp
 
 def cos_similarities(supports, query):
@@ -261,11 +264,9 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
     return dist2
 
 file_objs = {}
-for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
+for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
     data_file_name = "omniglot_"
-    if batch_norm:
-      data_file_name += "normalization_"
     data_file_name += model_style+"_lsh_"+method+".csv"
     if file_write and file_write_path:
       file_objs[data_file_name] = open(file_write_path + "/" + data_file_name, 'w')
@@ -324,8 +325,8 @@ for category in model_list:
         if end_file[index + 1] == "dropout":
           index += 1
           dropout = True
-        #nKernels = [64 for x in range(int(end_file[index+1]))]
-        reference_dict = (#("nLayers", end_file[index + 1]),
+        nKernels = [64 for x in range(int(end_file[index+1]))]
+        reference_dict = (("nLayers", end_file[index + 1]),
                           ("classes", end_file[index + 2-1]),
                           ("supports", end_file[index+3-1]))
       elif end_file[index] == "lsh":
@@ -338,8 +339,8 @@ for category in model_list:
           if end_file[index + 1] == "dropout":
             index += 1
             dropout = True
-          #nKernels = [64 for x in range(int(end_file[index+1]))]
-          reference_dict = (#("nLayers", end_file[index + 1]),
+          nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (("nLayers", end_file[index + 1]),
                             ("classes", end_file[index + 3-1]),
                             ("supports", end_file[index + 4-1]),
                             ("period", end_file[index + 2-1]))
@@ -352,8 +353,8 @@ for category in model_list:
           if end_file[index + 1] == "dropout":
             index += 1
             dropout = True
-          #nKernels = [64 for x in range(int(end_file[index+1]))]
-          reference_dict = (#("nLayers", end_file[index + 1]),
+          nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (("nLayers", end_file[index + 1]),
                             ("classes", end_file[index + 4 - 1]),
                             ("supports", end_file[index + 5- 1]),
                             ("planes", end_file[index + 3-1]),
@@ -583,9 +584,7 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "omniglot_"
-                if batch_norm:
-                  output_file += "normalization_"
+                output_file = "cifar_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 output += str(batch_norm)+","+str(dropout) + ","

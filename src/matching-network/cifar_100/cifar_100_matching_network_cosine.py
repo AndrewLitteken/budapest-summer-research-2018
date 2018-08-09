@@ -38,10 +38,11 @@ check = 1000
 batchS = 32
 nRandPlanes = 100
 learning_rate = 1e-6
-
+tensorboard = False
 # Support and testing information
 nClasses = 3
-
+batch_norm = False
+batch_norm = True
 nImgsSuppClass = 5
 
 base = "/tmp/cifar-100-cosine-"
