@@ -1,9 +1,0 @@
-training,period,nClasses,calculated testing planes,cos acc, lsh acc,eff
-one,100,3,trained,0.557,0.83,0.563
-one,100,3,random,0.534,0.189,0.225
-one,200,3,trained,0.534,0.846,0.52
-one,200,3,random,0.525,0.142,0.171
-one,500,3,trained,0.549,0.853,0.544
-one,500,3,random,0.557,0.135,0.165
-one,1000,3,trained,0.487,0.837,0.486
-one,1000,3,random,0.486,0.237,0.254
