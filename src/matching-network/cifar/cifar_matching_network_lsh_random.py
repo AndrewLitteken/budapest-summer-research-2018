@@ -46,14 +46,14 @@ nClasses = 3
 batch_norm = False
 dropout = False
 integer_range = 100
-
+tensorboard = False
 nImgsSuppClass = 5
 
 training = False
 
 base = "/tmp/cifar-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "base_path=", "num_iterations=",
   "dropout", "batch_norm", "num_layers=", "num_planes="])
 

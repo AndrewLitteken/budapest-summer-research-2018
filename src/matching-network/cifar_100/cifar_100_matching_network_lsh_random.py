@@ -35,12 +35,12 @@ poolS = 2
 nIt = 5000
 check = 1000
 batchS = 32
-nPlanes = 100
+nPlanes = 500
 learning_rate = 1e-8
 integer_range = 100
 batch_norm = False
 dropout = True
-
+tensorboard = False
 # Support and testing information
 nClasses = 3
     
@@ -50,7 +50,7 @@ training = False
 
 base = "/tmp/cifar-100-lsh-random-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hmnodL:c:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hmnodL:p:c:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "base_path=", "num_iterations=",
   "dropout", "batch_norm", "num_layers=", "num_planes="])
 
