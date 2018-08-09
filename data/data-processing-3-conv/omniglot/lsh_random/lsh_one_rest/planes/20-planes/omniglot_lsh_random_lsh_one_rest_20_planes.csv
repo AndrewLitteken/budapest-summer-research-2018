@@ -1,0 +1,5 @@
+method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,testing_classes,testing_supports,integer_range,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
+lsh_one_rest,True,True,4,20,5,1000,False,20,1,1000,True,0.3028,0.0464,0.066
+lsh_one_rest,True,True,4,20,5,1000,False,20,2,1000,True,0.2038,0.0492,0.0812
+lsh_one_rest,True,True,4,20,5,1000,False,20,5,1000,True,0.2758,0.0494,0.0538
+lsh_one_rest,True,True,4,20,5,1000,False,20,10,1000,True,0.2492,0.051,0.0654

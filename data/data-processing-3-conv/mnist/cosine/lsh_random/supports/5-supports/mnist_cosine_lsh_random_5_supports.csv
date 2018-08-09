@@ -1,0 +1,11 @@
+method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,testing_classes,testing_supports,testing_planes,integer_range,unseen,cos_acc,true_lsh_acc,sigmoid_lsh_acc
+lsh_random,True,True,3,5,5,5,5,100,1000,True,0.8328,0.7634,0.7648
+lsh_random,True,True,3,5,5,5,5,200,1000,True,0.8286,0.7022,0.7036
+lsh_random,True,True,3,5,5,5,5,500,1000,True,0.906,0.858,0.8582
+lsh_random,True,True,3,5,5,5,5,600,1000,True,0.892,0.8776,0.8782
+lsh_random,True,True,3,5,5,5,5,750,1000,True,0.8738,0.8628,0.864
+lsh_random,True,True,3,5,5,5,5,1000,1000,True,0.9136,0.9018,0.9018
+lsh_random,True,True,3,5,5,5,5,1250,1000,True,0.8848,0.8646,0.866
+lsh_random,True,True,3,5,5,5,5,1500,1000,True,0.9198,0.9046,0.9066
+lsh_random,True,True,3,5,5,5,5,1750,1000,True,0.8684,0.847,0.848
+lsh_random,True,True,3,5,5,5,5,2000,1000,True,0.9026,0.8792,0.8808
