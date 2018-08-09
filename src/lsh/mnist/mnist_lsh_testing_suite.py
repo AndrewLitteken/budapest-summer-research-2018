@@ -167,6 +167,9 @@ def create_network(img, size, First = False):
         padding="SAME")
       currInp = poolR
   
+  if dropout:
+    currInp = tf.nn.dropout(currInp, 0.8)
+
   return currInp
 
 def cos_similarities(supports, query):

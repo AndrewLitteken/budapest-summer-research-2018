@@ -59,7 +59,7 @@ nImgsSuppClass = 5
 
 base = "/tmp/omniglot-lsh-one-all-"
 
-opts, args = getopt.getopt(sys.argv[1:], "hnoLc:p:i:b:s:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnmoLc:p:i:b:s:", ["help", 
   "num_classes=", "num_supports=", "period_length=", "base_path=", 
   "num_iterations="])
 
