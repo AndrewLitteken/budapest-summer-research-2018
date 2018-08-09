@@ -230,6 +230,7 @@ def create_network(img, size, First = False):
         padding="SAME")
       currInp = poolR
   if dropout:
+    pass
     currInp = tf.nn.dropout(currInp, 0.8)
   return currInp
 
