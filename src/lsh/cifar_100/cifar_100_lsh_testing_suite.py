@@ -19,10 +19,6 @@ import math
 import sys
 import pickle
 
-import cifar_100
-
-cifar_100.get_data()
-
 LOG_DIR = "./cifar_100_testing"
 
 train_file_path = "../../../testing-data/cifar-100/train"
@@ -36,24 +32,6 @@ with open(train_file_path, 'rb') as cifar_file:
 test_file_name = "../../../testing-data/cifar-100/test"
 with open(test_file_name, 'rb') as cifar_file:
   test = pickle.load(cifar_file)
-
-def make_dir_list(data_dir):
-  path_train = "{}images_background/".format(data_dir)
-  path_test = "{}images_evaluation/".format(data_dir)
-
-  train_dirs = []
-  test_dirs = []
-  for alphabet in os.listdir(path_train):
-    if not alphabet.startswith('.') : 
-      for character in os.listdir("{}{}/".format(path_train,alphabet)):
-        train_dirs.append("{}{}/{}".format(path_train, alphabet, character))
-
-  for alphabet in os.listdir(path_test):
-    if not alphabet.startswith('.') : 
-      for character in os.listdir("{}{}/".format(path_test, alphabet)):
-        test_dirs.append("{}{}/{}".format(path_test, alphabet, character))
-
-  return np.asarray(train_dirs), np.asarray(test_dirs)
 
 # Graph Constants
 size = [32, 32, 3]
@@ -277,20 +255,18 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
     return dist2
 
 file_objs = {}
-for model_style in ["cosine"]:#, "lsh_random", "lsh_one_rest"]:
+for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "omniglot_"
-    if batch_norm:
-      data_file_name += "normalization_"
+    data_file_name = "cifar_100_"
     data_file_name += model_style+"_lsh_"+method+".csv"
     if file_write and file_write_path:
       file_objs[data_file_name] = open(file_write_path + "/" + data_file_name, 'w')
     elif file_write:
       file_objs[data_file_name] = open(base_path +"/data/csv/"+data_file_name, 'w')
     first_line = "method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,"
-    if model_style == "one_rest":
+    if model_style == "lsh_one_rest":
       first_line += "model_period,"
-    elif model_style == "random":
+    elif model_style == "lsh_random":
       first_line += "model_planes,model_trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":
@@ -607,8 +583,6 @@ for category in model_list:
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
                 output_file = "omniglot_"
-                if batch_norm:
-                  output_file += "normalization_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 output += str(batch_norm)+","+str(dropout) + ","

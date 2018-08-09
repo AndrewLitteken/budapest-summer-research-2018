@@ -397,18 +397,44 @@ for category in model_list:
         queryFeatureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
       queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))
 
-    for method in hashing_methods:
-      for nPlanes in nPlanes_list:
-        for nClasses in nClasses_list:
-          if method == "one_rest":
-            nPlanes = nClasses
-          for unseen in unseen_list:
-            if unseen:
-                numbers = classList[10-nClasses:]
-            else:
-                numbers = classList[:nClasses]
-            for nSuppImgs in nSuppImgs_list:
-              for integer_range in integer_range_list:  
+    for nClasses in nClasses_list:
+      for unseen in unseen_list:
+        if unseen:
+            numbers = classList[10-nClasses:]
+        else:
+            numbers = classList[:nClasses]
+        for nSuppImgs in nSuppImgs_list:
+          supp = []
+          supp_labels = []
+          for j in numbers: 
+            n = 0 
+            while n < nSuppImgs:
+              supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
+              while int(np.argmax(mnist.train.labels[supp_index])) != j:
+                supp_index += 1
+                if supp_index == len(mnist.train.images):
+                  supp_index = 0 
+              n += 1   
+              supp.append(featureVectors[supp_index])
+              supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
+          queries = []
+          for i in range(nTrials):
+            query_index = random.randint(0, mnist.test.images.shape[0] - 1)
+            while np.argmax(queryLabels[query_index]) not in numbers:
+              query_index += 1
+              if query_index == len(mnist.test.images):
+                  query_index = 0
+            query = queryFeatureVectors[query_index]
+            query_label = np.argmax(queryLabels[query_index])
+            queries.append((query, query_label))    
+          for integer_range in integer_range_list:
+            for method in hashing_methods:
+              if method == "one_rest":
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nClasses, supp, supp_labels, numbers)
+                    lsh_planes = np.transpose(lsh_planes)
+              for nPlanes in nPlanes_list:
+                if method == "one_rest":
+                  nPlanes = nClasses  
                 tf.reset_default_graph()
 
                 nSupp = nClasses * nSuppImgs
@@ -456,56 +482,12 @@ for category in model_list:
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
 
-                if not new_set:
-                  supp = []
-                  supp_labels = []
-                  for j in numbers: 
-                    n = 0 
-                    while n < nSuppImgs:
-                      supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-                      while int(np.argmax(mnist.train.labels[supp_index])) != j:
-                        supp_index += 1
-                        if supp_index == len(mnist.train.images):
-                          supp_index = 0 
-                      n += 1   
-                      supp.append(featureVectors[supp_index])
-                      supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
-
-                  if method == "one_rest":
-                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
-                    lsh_planes = np.transpose(lsh_planes)
-
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
 
                   for i in range(nTrials):
-                  
-                    if new_set:
-                      supp = []
-                      supp_labels = []
-                      for j in numbers: 
-                        n = 0 
-                        while n < nSuppImgs:
-                          supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-                          while int(np.argmax(mnist.train.labels[supp_index])) != j:
-                            supp_index += 1
-                            if supp_index == len(mnist.train.images):
-                              supp_index = 0 
-                          n += 1   
-                          supp.append(featureVectors[supp_index])
-                          supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
-
-                      if method == "one_rest":
-                        lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
-                        lsh_planes = np.transpose(lsh_planes)
-                    # choose random query
-                    query_index = random.randint(0, mnist.test.images.shape[0] - 1)
-                    while np.argmax(queryLabels[query_index]) not in numbers:
-                      query_index += 1
-                      if query_index == len(mnist.test.images):
-                          query_index = 0
-                    query = queryFeatureVectors[query_index]
-                    query_label = np.argmax(queryLabels[query_index])
+                    query = queries[i][0]
+                    query_label = queries[i][1]
 
                     if i == 1 and tensorboard:
                       batching = "non_batch/"
@@ -564,8 +546,8 @@ for category in model_list:
                   print(output)
                 if file_write:
                   file_objs[output_file].write(output + "\n")
-        if method == "one_rest":
-          break
+                if method == "one_rest":
+                  break
 
 for file_obj in file_objs.keys():
   file_objs[file_obj].close() 

@@ -1,13 +1,14 @@
-# Checking viability of LSH with random planes MNIST
+# Checking viability of LSH with random planes Omniglot
 
 import os
 
-os.environ["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"] + ":/afs/crc.nd.edu/x86_64_linux/c/cuda/8.0/extras/CUPTI/lib64/"
+#os.environ["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"] + ":/afs/crc.nd.edu/x86_64_linux/c/cuda/8.0/extras/CUPTI/lib64/"
 
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
+from skimage import transform, io
 from sklearn import svm
 import tensorflow as tf
 import numpy as np
@@ -16,20 +17,24 @@ import getopt
 import random
 import math
 import sys
+import pickle
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+LOG_DIR = "./cifar_100_testing"
 
-split_path = dir_path.split("/")
-base_path = "/".join(split_path[:-3])
-train_file_path = base_path+"/testing-data/MNIST_data/"
-LOG_DIR = "./mnist_testing"
+train_file_path = "../../../testing-data/cifar-100/train"
+train_images_raw = np.empty((0, 3072))
+train_labels_raw = np.empty((0))
+with open(train_file_path, 'rb') as cifar_file:
+  data = pickle.load(cifar_file)
+  train_images_raw = data[b"data"]
+  train_labels_raw = data[b"fine_labels"]
 
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets(train_file_path,
-  one_hot=True)
+test_file_name = "../../../testing-data/cifar-100/test"
+with open(test_file_name, 'rb') as cifar_file:
+  test = pickle.load(cifar_file)
 
 # Graph Constants
-size = [28, 28, 1]
+size = [32, 32, 3]
 nKernels = [64, 64, 64]
 fully_connected_nodes = 128
 poolS = 2
@@ -49,13 +54,13 @@ model_dir = None
 one_model = False
 file_write = False
 file_write_path = None
-tensorboard = True
+tensorboard = False
 integer_range_list = [1000]
 integer_change = False
 new_set = False
 batch_norm = False
-dropout = False
 verbose = True
+dropout = False
 
 def help_message():
   print("Testing Suite LSH Hashing for variable number of items\n")
@@ -80,14 +85,11 @@ def help_message():
   print("")
   exit(1)
 
-opts, args = getopt.getopt(sys.argv[1:], "hnbvotf:c:r:s:p:u:d:i:m:l:", ["help", 
+opts, args = getopt.getopt(sys.argv[1:], "hnbvtf:c:r:s:p:u:d:i:m:l:", ["help", 
   "batch_norm","new_support_set","num_classes_list=", "num_supports_list=", 
   "num_iterations=","num_planes_list=","unseen_list=","model_dir=",
   "hashing_methods=","model_loc=","integer_range=","tensorboard=",
   "file_write=","no_verbose","tensorboard"])
-
-classList = [1,2,3,4,5,6,7,8,9,0]
-numbers = []
 
 for o, a in opts:
   if o in ("-c", "--num_classes"):
@@ -129,8 +131,6 @@ for o, a in opts:
       i == "random")]
   elif o in ("-b", "--batch_norm"):
     batch_norm = True
-  elif o in ("-o", "--dropout"):
-    dropout = True
   elif o in ("-n", "--new_support_set"):
     new_set = True
   elif o in ("-v", "--non_verbose"):
@@ -179,7 +179,7 @@ def cos_similarities(supports, query):
     cosDist = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
     return cosDist
 
-def gen_lsh_pick_planes(num_planes, feature_vectors, labels, numbers):
+def gen_lsh_pick_planes(num_planes, feature_vectors, labels):
   
   lsh_matrix = []
   lsh_offset_vals = []
@@ -187,7 +187,8 @@ def gen_lsh_pick_planes(num_planes, feature_vectors, labels, numbers):
   feature_vectors = np.reshape(np.asarray(feature_vectors),
     (len(feature_vectors), -1))
 
-  for index_i, i in enumerate(numbers):
+  label_dirs = set(labels)
+  for index_i, i in enumerate(label_dirs):
     x = []
     y = []
     for index in range(len(feature_vectors)):
@@ -256,18 +257,16 @@ def sigmoid_lsh_dist(lshVecSupp, lshVecQuery):
 file_objs = {}
 for model_style in ["cosine", "lsh_random", "lsh_one_rest"]:
   for method in hashing_methods:
-    data_file_name = "mnist_"
-    if batch_norm:
-      data_file_name += "normalization_"
+    data_file_name = "cifar_100_"
     data_file_name += model_style+"_lsh_"+method+".csv"
     if file_write and file_write_path:
       file_objs[data_file_name] = open(file_write_path + "/" + data_file_name, 'w')
     elif file_write:
       file_objs[data_file_name] = open(base_path +"/data/csv/"+data_file_name, 'w')
     first_line = "method,model_batch_norm,model_dropout,model_layers,model_classes,model_supports,"
-    if model_style == "one_rest":
+    if model_style == "lsh_one_rest":
       first_line += "model_period,"
-    elif model_style == "random":
+    elif model_style == "ilsh_random":
       first_line += "model_planes,model_trained_planes,"
     first_line += "testing_classes,testing_supports,"
     if method == "random":
@@ -304,11 +303,10 @@ for category in model_list:
       SAVE_PATH = model_dir + "/" + category + "/" + model_name    
 
     end_file = file_name.split("-")
+
     index = 0
     reference_dict = None
     model_style = None
-    batch_norm = False
-    dropout = False
     while not reference_dict:
       if end_file[index] == "cosine":
         model_style = "cosine"
@@ -318,10 +316,10 @@ for category in model_list:
         if end_file[index + 1] == "dropout":
           index += 1
           dropout = True
-        nKernels = [64 for x in range(int(end_file[index+1]))]
-        reference_dict = (("nLayers", end_file[index + 1]),
-                          ("classes", end_file[index + 2]),
-                          ("supports", end_file[index+3]))
+        #nKernels = [64 for x in range(int(end_file[index+1]))]
+        reference_dict = (#("nLayers", end_file[index + 1]),
+                          ("classes", end_file[index + 2-1]),
+                          ("supports", end_file[index+3-1]))
       elif end_file[index] == "lsh":
         if end_file[index + 1] == "one":
           index += 2
@@ -332,11 +330,11 @@ for category in model_list:
           if end_file[index + 1] == "dropout":
             index += 1
             dropout = True
-          nKernels = [64 for x in range(int(end_file[index+1]))]
-          reference_dict = (("nLayers", end_file[index + 1]),
-                            ("classes", end_file[index + 3]),
-                            ("supports", end_file[index + 4]),
-                            ("period", end_file[index + 2]))
+          #nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (#("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 3-1]),
+                            ("supports", end_file[index + 4-1]),
+                            ("period", end_file[index + 2-1]))
         else:
           model_style = "lsh_random"
           index += 1
@@ -346,12 +344,12 @@ for category in model_list:
           if end_file[index + 1] == "dropout":
             index += 1
             dropout = True
-          nKernels = [64 for x in range(int(end_file[index+1]))]
-          reference_dict = (("nLayers", end_file[index + 1]),
-                            ("classes", end_file[index + 4]),
-                            ("supports", end_file[index + 5]),
-                            ("planes", end_file[index + 3]),
-                            ("training", end_file[index + 2]))
+          #nKernels = [64 for x in range(int(end_file[index+1]))]
+          reference_dict = (#("nLayers", end_file[index + 1]),
+                            ("classes", end_file[index + 4 - 1]),
+                            ("supports", end_file[index + 5- 1]),
+                            ("planes", end_file[index + 3-1]),
+                            ("training", end_file[index + 2-1]))
       index+=1
     
     tf.reset_default_graph()
@@ -362,53 +360,108 @@ for category in model_list:
     features = create_network(dataset, size)
 
     init = tf.global_variables_initializer()
+    for unseen in unseen_list:
+      train_images = []
+      train_labels = []
+      list_range = np.arange(len(train_images_raw))
+      np.random.shuffle(list_range)
+      for index, i in enumerate(list_range):
+        if ((train_labels_raw[i] < 80 and not unseen) or (train_labels_raw[i]
+          > 79 and unseen)):
+          train_images.append(train_images_raw[i])
+          train_labels.append(train_labels_raw[i])
 
-    with tf.Session() as session:
-      session.run(init)
+      train_images = np.reshape(train_images, [len(train_images), 3, 32, 32])
+      train_images = np.transpose(train_images, [0, 2, 3, 1])
 
-      Saver = tf.train.Saver()
-      Saver.restore(session, SAVE_PATH)
+      test_images_raw = test[b"data"]
+      test_labels_raw = test[b"fine_labels"]
+      list_range = np.arange(len(test_images_raw))
+      np.random.shuffle(list_range)
 
-      rawDataset = np.reshape(mnist.train.images, [mnist.train.images.shape[0]] + size)
-      rawLabels = mnist.train.labels
+      test_images = []
+      test_labels = []
+      for index, i in enumerate(list_range):
+        if ((test_labels_raw[i] < 80 and not unseen) or (test_labels_raw[i]
+          > 79 and unseen)):
+          test_images.append(test_images_raw[i])
+          test_labels.append(test_labels_raw[i])
+      test_images = np.reshape(test_images, [len(test_images), 3, 32, 32])
+      test_images = np.transpose(test_images, [0, 2, 3, 1])
+      with tf.Session() as session:
+        session.run(init)
 
-      featureVectors = None
-      for i in range(int(len(rawDataset)/batchS)):
-        FEAT = (session.run([features], feed_dict =
-          {dataset: rawDataset[i*batchS:(i+1)*batchS]}))
-        FEAT = np.asarray(FEAT)
-        if featureVectors is None:
-          featureVectors = np.empty([len(rawDataset), FEAT.shape[2], 
-            FEAT.shape[3], FEAT.shape[4]])
-        featureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
-      featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))  
+        Saver = tf.train.Saver()
+        Saver.restore(session, SAVE_PATH)
 
-      queryDataset = np.reshape(mnist.test.images, [mnist.test.images.shape[0]]+size)
-      queryLabels = mnist.test.labels
+        rawDataset = train_images
+        rawLabels = train_labels
+        
+        featureVectors = None
+        for i in range(int(len(rawDataset)/1000)):
+          FEAT = (session.run([features], feed_dict = 
+            {dataset: rawDataset[i*1000:(i+1)*1000]}))
+          FEAT = np.asarray(FEAT)
+          if featureVectors is None:
+            featureVectors = np.empty([len(rawDataset), FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+          featureVectors[i*1000:(i+1)*1000] = FEAT[0]
+        featureVectors = np.reshape(featureVectors, (len(rawDataset), -1))
 
-      queryFeatureVectors = None
-      for i in range(int(len(queryDataset)/batchS)):
-        FEAT = (session.run([features], feed_dict =
-          {dataset: queryDataset[i*batchS:(i+1)*batchS]}))
-        FEAT = np.asarray(FEAT)
-        if queryFeatureVectors is None:
-          queryFeatureVectors = np.empty([len(queryDataset), 
-            FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
-        queryFeatureVectors[i*batchS:(i+1)*batchS] = FEAT[0]
-      queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))
+        queryDataset = test_images
+        queryLabels = test_labels 
+        
+        queryFeatureVectors = None
+        for i in range(int(len(queryDataset)/1000)):
+          FEAT = (session.run([features], feed_dict = 
+            {dataset: queryDataset[i*1000:(i+1)*1000]}))
+          FEAT = np.asarray(FEAT)
+          if queryFeatureVectors is None:
+            queryFeatureVectors = np.empty([len(queryDataset), FEAT.shape[2], FEAT.shape[3], FEAT.shape[4]])
+          queryFeatureVectors[i*1000:(i+1)*1000] = FEAT[0]
+        queryFeatureVectors = np.reshape(queryFeatureVectors, (len(queryDataset), -1))
 
-    for method in hashing_methods:
-      for nPlanes in nPlanes_list:
-        for nClasses in nClasses_list:
-          if method == "one_rest":
-            nPlanes = nClasses
-          for unseen in unseen_list:
-            if unseen:
-                numbers = classList[10-nClasses:]
-            else:
-                numbers = classList[:nClasses]
-            for nSuppImgs in nSuppImgs_list:
-              for integer_range in integer_range_list:  
+      for nClasses in nClasses_list:
+        images = []
+        while len(images) < nClasses:
+          choice = random.choice(train_labels)
+          while choice in images:
+            choice = random.choice(train_labels)
+          images.append(choice)
+
+        for nSuppImgs in nSuppImgs_list:
+          supp = []
+          supp_labels = []
+          for choice in images:
+            n = 0
+            while n < nSuppImgs:
+              supp_index = random.randint(0, train_images.shape[0] - 1)
+              while int(train_labels[supp_index]) != choice:
+                supp_index += 1
+                if supp_index == len(train_images):
+                  supp_index = 0
+              n += 1
+              supp.append(featureVectors[supp_index])
+              supp_labels.append(int(train_labels[supp_index]))
+
+          queries = []
+          for i in range(nTrials):
+            query_value = random.choice(images)
+            query_index = random.randint(0, test_images.shape[0] - 1)
+            while query_value != int(queryLabels[query_index]):
+              query_index += 1
+              if query_index == len(test_images):
+                query_index = 0
+            query = queryFeatureVectors[query_index]
+            query_label = queryLabels[query_index] 
+            queries.append((query,query_label))
+          for integer_range in integer_range_list:
+            for method in hashing_methods:
+              if method == "one_rest":
+                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nClasses, supp, supp_labels)
+                    lsh_planes = np.transpose(lsh_planes)
+              for nPlanes in nPlanes_list: 
+                if method == "one_rest":
+                  nPlanes = nClasses
                 tf.reset_default_graph()
 
                 nSupp = nClasses * nSuppImgs
@@ -424,9 +477,10 @@ for category in model_list:
                 summary = tf.summary.merge_all()
                 #with tf.name_scope("cosine"):
                 #  with tf.name_scope("cosine_distance"):
-                dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
-                supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
-                cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
+                with tf.name_scope("cosine_distance"):
+                  dotProduct = tf.reduce_sum(tf.multiply(support_vectors, query_vector, name = "feature_multiply"), (1), name = "product_add")
+                  supportsMagn = tf.sqrt(tf.reduce_sum(tf.square(support_vectors, name = "mag_sqaure"), (1)), name = "mag_sqrt")
+                  cosine_distances = tf.divide(dotProduct, tf.clip_by_value(supportsMagn, 1e-10, float("inf")), name = "cos_div")
                   
                 #with tf.name_scope("true_lsh"):
                 #  query_true = lsh_true_hash(query_vector, lsh_planes_tf, lsh_offsets_tf, "")
@@ -435,17 +489,19 @@ for category in model_list:
                 lsh_vector = lsh_sig_hash(query_vector, lsh_planes_tf, lsh_offsets_tf)
                 #with tf.name_scope("true_lsh_equal"):
                   #with tf.name_scope("true_lsh_hashing"):
-                lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
-                lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
-                lsh_bin = tf.cast(lsh_bin, bool)
+                with tf.name_scope("true_lsh_hashing"):
+                  lsh_bin = tf.sign(lsh_vector, name = "bin_signs")
+                  lsh_bin = tf.clip_by_value(lsh_bin, 0, 1, name = "clip")
+                  lsh_bin = tf.cast(lsh_bin, bool)
                   #with tf.name_scope("true_lsh_distance"):
-                dist = tf.equal(supp_true, lsh_bin)
-                true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
+                  dist = tf.equal(supp_true, lsh_bin)
+                  true_lsh_distances = tf.reduce_sum(tf.cast(dist, tf.int32), [1])
                 #with tf.name_scope("sigmoid_lsh"):
                   #with tf.name_scope("sigmoid_lsh_distance"):
-                dist_2 = tf.multiply(supp_sig, lsh_vector)
-                dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-1.0, dist_2))))
-                sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
+                with tf.name_scope("sig_lsh_hashing"):
+                  dist_2 = tf.multiply(supp_sig, lsh_vector)
+                  dist2 = tf.divide(1.0, np.add(1.0, tf.exp(tf.multiply(-50.0, dist_2))))
+                  sigmoid_lsh_distances = tf.reduce_sum(dist2, [1])  # check this!
                 
                 sumEff = 0
                 cos_acc = 0
@@ -456,56 +512,14 @@ for category in model_list:
                 if method == "random":
                   lsh_planes, lsh_offset_vals = gen_lsh_random_int_planes(nPlanes, featureVectors[:nSupportTraining], rawLabels)
 
-                if not new_set:
-                  supp = []
-                  supp_labels = []
-                  for j in numbers: 
-                    n = 0 
-                    while n < nSuppImgs:
-                      supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-                      while int(np.argmax(mnist.train.labels[supp_index])) != j:
-                        supp_index += 1
-                        if supp_index == len(mnist.train.images):
-                          supp_index = 0 
-                      n += 1   
-                      supp.append(featureVectors[supp_index])
-                      supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
-
-                  if method == "one_rest":
-                    lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels, numbers)
-                    lsh_planes = np.transpose(lsh_planes)
-
                 with tf.Session() as session:
                   session.run(tf.global_variables_initializer())
 
                   for i in range(nTrials):
-                  
-                    if new_set:
-                      supp = []
-                      supp_labels = []
-                      for j in numbers: 
-                        n = 0 
-                        while n < nSuppImgs:
-                          supp_index = random.randint(0, mnist.train.images.shape[0] - 1)
-                          while int(np.argmax(mnist.train.labels[supp_index])) != j:
-                            supp_index += 1
-                            if supp_index == len(mnist.train.images):
-                              supp_index = 0 
-                          n += 1   
-                          supp.append(featureVectors[supp_index])
-                          supp_labels.append(int(np.argmax(mnist.train.labels[supp_index])))
-
-                      if method == "one_rest":
-                        lsh_planes, lsh_offset_vals = gen_lsh_pick_planes(nPlanes, supp, supp_labels)
-                        lsh_planes = np.transpose(lsh_planes)
                     # choose random query
-                    query_index = random.randint(0, mnist.test.images.shape[0] - 1)
-                    while np.argmax(queryLabels[query_index]) not in numbers:
-                      query_index += 1
-                      if query_index == len(mnist.test.images):
-                          query_index = 0
-                    query = queryFeatureVectors[query_index]
-                    query_label = np.argmax(queryLabels[query_index])
+                    # choose random query
+                    query = queries[i][0]
+                    query_label = queries[i][1]
 
                     if i == 1 and tensorboard:
                       batching = "non_batch/"
@@ -549,7 +563,7 @@ for category in model_list:
                 cos_lsh_acc = float(cos_acc)/(nTrials)
                 calc_lsh_acc = float(lsh_acc)/(nTrials)
                 calc_lsh_acc2 = float(lsh_acc2)/(nTrials)
-                output_file = "mnist_"
+                output_file = "cifar_100_"
                 output_file += model_style+"_lsh_"+method+".csv"
                 output="lsh_"+method+","
                 output += str(batch_norm)+","+str(dropout) + ","
@@ -564,8 +578,8 @@ for category in model_list:
                   print(output)
                 if file_write:
                   file_objs[output_file].write(output + "\n")
-        if method == "one_rest":
-          break
+                if method == "one_rest":
+                  break
 
 for file_obj in file_objs.keys():
   file_objs[file_obj].close() 
