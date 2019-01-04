@@ -1,2 +1,0 @@
-model_checkpoint_path: "cifar-100-cosine-norm-dropout-3-20-5-10000"
-all_model_checkpoint_paths: "cifar-100-cosine-norm-dropout-3-20-5-10000"

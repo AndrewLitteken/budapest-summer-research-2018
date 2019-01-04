@@ -1,2 +1,0 @@
-model_checkpoint_path: "mnist-lsh-random-norm-dropout-3-False-1000-5-5-10000"
-all_model_checkpoint_paths: "mnist-lsh-random-norm-dropout-3-False-1000-5-5-10000"
